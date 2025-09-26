@@ -17,6 +17,7 @@ const SALT_ROUNDS = 12;
 
 /** List users (never return password_hash) */
 export async function listUsers(): Promise<User[]> {
+  // NOTE: list = no WHERE id=$1 ; return all users ordered by newest
   const { rows } = await query<User>(
     "SELECT id, name, email, created_at FROM public.users ORDER BY id DESC"
   );
@@ -41,10 +42,7 @@ export async function getUserWithHashByEmail(email: string): Promise<UserWithHas
   return rows[0] ?? null;
 }
 
-/**
- * Create user WITH password (hashing).
- * NOTE: This replaces the previous createUser(name, email) version.
- */
+/** Create user WITH password (hashing). */
 export async function createUser(
   name: string,
   email: string,

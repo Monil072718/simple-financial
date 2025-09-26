@@ -26,11 +26,18 @@ export async function POST(req: NextRequest) {
   const { name, email, password } = parsed.data;
 
   try {
-    const user = await createUser(name, email, password);
-    // Never return password/hash
-    return NextResponse.json(user, { status: 201 });
+    // create in DB (hashes password internally)
+    await createUser(name, email, password);
+
+    // return the same shape you sent (without password)
+    return NextResponse.json(
+      {
+        name,
+        email,
+      },
+      { status: 201 }
+    );
   } catch (e: any) {
-    // Unique violation in Postgres
     if (e?.code === "23505") {
       return NextResponse.json({ error: "Email already exists" }, { status: 409 });
     }

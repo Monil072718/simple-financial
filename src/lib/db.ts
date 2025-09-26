@@ -1,41 +1,28 @@
-import { Pool } from "pg";
+// src/lib/db.ts
+import { Pool, QueryResult } from "pg";
 
-declare global {
-  // allow global pool reuse in dev
-  var __pgPool__: Pool | undefined;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // or build from PGHOST/PGUSER/PGPASSWORD/PGPORT/PGDATABASE
+  ssl:
+    process.env.PGSSL === "true"
+      ? { rejectUnauthorized: false }
+      : undefined,
+});
+
+// Generic query helper: allows query<User>(...) style
+export async function query<T = any>(
+  text: string,
+  params?: any[]
+): Promise<{ rows: T[]; rowCount: number }> {
+  const res: QueryResult = await pool.query(text, params);
+  return {
+    rows: res.rows as T[],
+    rowCount: res.rowCount ?? res.rows.length,
+  };
 }
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("❌ DATABASE_URL is not set in .env");
+// Optional: simple health check
+export async function ping() {
+  const r = await query<{ now: string }>("SELECT NOW() as now");
+  return r.rows[0].now;
 }
-
-export const pool =
-  global.__pgPool__ ??
-  new Pool({
-    connectionString,
-  });
-
-// Log successful connection
-pool
-  .connect()
-  .then((client) => {
-    console.log("✅ Connected to PostgreSQL:", {
-      database: client.database,
-      user: client.user,
-      host: client.host,
-      port: client.port,
-    });
-    client.release();
-  })
-  .catch((err) => {
-    console.error("❌ PostgreSQL connection error:", err.message);
-  });
-
-if (process.env.NODE_ENV !== "production") global.__pgPool__ = pool;
-
-export const query = (text: string, params?: any[]) => {
-  console.log("📥 Executing SQL:", text, params || []);
-  return pool.query(text, params);
-};

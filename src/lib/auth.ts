@@ -1,4 +1,5 @@
-import jwt from "jsonwebtoken";
+// src/lib/auth.ts
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 export type AuthUser = { id: number; email: string };
 
@@ -11,8 +12,19 @@ export function verifyAuth(headerAuth?: string): AuthUser | null {
   if (!secret) throw new Error("JWT_SECRET not set");
 
   try {
-    const decoded = jwt.verify(token, secret) as { sub: number; email: string };
-    return { id: Number(decoded.sub), email: decoded.email };
+    // verify can return string | JwtPayload
+    const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
+
+    // If it's a string, it's not our object payload
+    if (typeof decoded === "string") return null;
+
+    // decoded is JwtPayload; pull fields safely
+    const sub = decoded.sub;               // string | number | undefined
+    const email = (decoded as any).email;  // JwtPayload is indexable
+
+    if (sub == null || !email) return null;
+
+    return { id: Number(sub), email: String(email) };
   } catch {
     return null;
   }
