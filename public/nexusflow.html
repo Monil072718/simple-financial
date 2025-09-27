@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusFlow - Project Management</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <!-- PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-icons-outlined { font-size: 20px; }
+        .modal-content { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .overflow-x-auto::-webkit-scrollbar { height: 8px; }
+        .overflow-x-auto::-webkit-scrollbar-track { background: transparent; }
+        .overflow-x-auto::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .highlight { animation: highlight-fade 2.5s ease-out; }
+        @keyframes highlight-fade { 0%, 10% { background-color: #fef08a; color: #1f2937; } 100% { background-color: #374151; color: #e5e7eb; } }
+        #csvGrid table { border-collapse: collapse; width: 100%; }
+        #csvGrid th, #csvGrid td { border: 1px solid #4b5563; padding: 8px; text-align: left; }
+        #csvGrid th { background-color: #374151; }
+        #csvGrid td:focus { outline: 2px solid #2563eb; background-color: #1e293b; }
+        .toggle-checkbox:checked { background-color: #2563eb; }
+        .toggle-checkbox:checked::before { transform: translateX(100%); border-color: #2563eb; }
+        .calendar-day { min-height: 120px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <!-- =========== LOGIN VIEW =========== -->
+    <div id="loginView" class="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+        <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+                 <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
+                 <p class="text-gray-400 mt-2">The future of project collaboration.</p>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
+                <form id="loginForm">
+                    <div class="mb-4">
+                        <label for="email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+                        <input type="email" id="email" value="project.manager@example.com" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="password" value="password" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required>
+                    </div>
+                    <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Sign In</button>
+                    <p class="text-center text-gray-500 text-sm mt-6">Don't have an account? <a href="#" id="goToRegister" class="text-cyan-400 hover:underline">Sign Up</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========== REGISTER VIEW (NEW) =========== -->
+    <div id="registerView" class="min-h-screen hidden items-center justify-center bg-gray-900 p-4">
+        <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+                 <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
+                 <p class="text-gray-400 mt-2">Create your account</p>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
+                <form id="registerForm">
+                    <div class="mb-4">
+                        <label for="reg_name" class="block text-gray-400 text-sm font-bold mb-2">Full Name</label>
+                        <input type="text" id="reg_name" placeholder="Jane Doe" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="reg_email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+                        <input type="email" id="reg_email" placeholder="you@example.com" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="reg_password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="reg_password" placeholder="Minimum 6 characters" minlength="6" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required>
+                    </div>
+                    <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Create Account</button>
+                    <p class="text-center text-gray-500 text-sm mt-6">Already have an account? <a href="#" id="goToLogin" class="text-cyan-400 hover:underline">Sign In</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========== MAIN APPLICATION VIEW =========== -->
+    <div id="appView" class="hidden">
+        <div class="flex h-screen bg-gray-900">
+            <!-- Sidebar Navigation -->
+            <nav class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+                <div class="p-6 text-center border-b border-gray-700">
+                    <h1 class="text-2xl font-bold text-cyan-400">NexusFlow</h1>
+                </div>
+                <div class="flex-grow p-4 space-y-2 overflow-y-auto">
+                    <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
+                    <ul id="projectNav" class="space-y-1"></ul>
+                    <button id="addNewProjectBtn" class="w-full mt-2 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>New Project</button>
+                    <hr class="border-gray-700 my-4">
+                    <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Tools</h3>
+                    <ul id="mainNav" class="space-y-1">
+                        <li><a href="#" data-view="todoView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">check_box</span>To-Do Lists</a></li>
+                        <li><a href="#" data-view="taskTrackingView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">grid_on</span>Task Tracking</a></li>
+                        <li><a href="#" data-view="milestonesView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">flag</span>Milestones</a></li>
+                        <li><a href="#" data-view="communicationView" id="commNavLink" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">send</span>Communication</a></li>
+                        <li><a href="#" data-view="profileView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">person</span>Profiles</a></li>
+                    </ul>
+                </div>
+                <div class="p-4 border-t border-gray-700">
+                     <button id="logoutBtn" class="w-full flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-800/50 hover:text-red-300"><span class="material-icons-outlined">logout</span>Logout</button>
+                </div>
+            </nav>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 flex flex-col overflow-hidden">
+                <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex justify-between items-center flex-shrink-0">
+                    <h2 id="viewTitle" class="text-xl font-semibold"></h2>
+                    <div class="flex items-center gap-4">
+                        <img src="https://placehold.co/40x40/1f2937/9ca3af?text=PM" alt="User Avatar" class="rounded-full">
+                        <div id="currentUserDisplay"></div>
+                    </div>
+                </header>
+                <div class="flex-1 overflow-y-auto" id="mainContent"></div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- =========== MODALS =========== -->
+    <div id="modalsContainer"></div>
+    <div id="colorPickerModal" class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50">
+         <div class="grid grid-cols-4 gap-1">
+            <div class="w-6 h-6 rounded bg-green-500 cursor-pointer" data-color="bg-green-500"></div><div class="w-6 h-6 rounded bg-yellow-500 cursor-pointer" data-color="bg-yellow-500"></div><div class="w-6 h-6 rounded bg-red-500 cursor-pointer" data-color="bg-red-500"></div><div class="w-6 h-6 rounded bg-blue-500 cursor-pointer" data-color="bg-blue-500"></div><div class="w-6 h-6 rounded bg-indigo-500 cursor-pointer" data-color="bg-indigo-500"></div><div class="w-6 h-6 rounded bg-purple-500 cursor-pointer" data-color="bg-purple-500"></div><div class="w-6 h-6 rounded bg-pink-500 cursor-pointer" data-color="bg-pink-500"></div><div class="w-6 h-6 rounded bg-gray-800 border border-gray-600 cursor-pointer" data-color=""></div>
+        </div>
+    </div>
+    
+    <script>
+    // Note: In a real app, jsPDF would be an import. For this demo, we use the global window.jspdf.
+    const { jsPDF } = window.jspdf;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM ELEMENTS ---
+        const loginView = document.getElementById('loginView');
+        const registerView = document.getElementById('registerView');
+        const appView = document.getElementById('appView');
+        const modalsContainer = document.getElementById('modalsContainer');
+        const mainContent = document.getElementById('mainContent');
+        const viewTitle = document.getElementById('viewTitle');
+
+        const goToRegister = document.getElementById('goToRegister');
+        const goToLogin = document.getElementById('goToLogin');
+
+        // --- Simple Client Auth Store (localStorage) ---
+        const LS_USERS_KEY = 'nexusflow_users';
+        const LS_SESSION_KEY = 'nexusflow_session';
+
+        function loadUsers() {
+            try { return JSON.parse(localStorage.getItem(LS_USERS_KEY)) || []; } catch { return []; }
+        }
+        function saveUsers(users) { localStorage.setItem(LS_USERS_KEY, JSON.stringify(users)); }
+        function getSession() {
+            try { return JSON.parse(localStorage.getItem(LS_SESSION_KEY)); } catch { return null; }
+        }
+        function setSession(user) { localStorage.setItem(LS_SESSION_KEY, JSON.stringify(user)); }
+        function clearSession() { localStorage.removeItem(LS_SESSION_KEY); }
+
+        // Seed sample user only if none exist (so your old demo login still works initially)
+        if (loadUsers().length === 0) {
+            saveUsers([{ name: 'Project Manager', email: 'project.manager@example.com', password: 'password', role: 'admin' }]);
+        }
+
+        // Hash-based soft routing for auth views
+        function showLogin() {
+            loginView.classList.remove('hidden');
+            loginView.classList.add('flex');
+            registerView.classList.add('hidden');
+            registerView.classList.remove('flex');
+            appView.classList.add('hidden');
+            history.replaceState(null, '', '#/login');
+        }
+        function showRegister() {
+            loginView.classList.add('hidden');
+            loginView.classList.remove('flex');
+            registerView.classList.remove('hidden');
+            registerView.classList.add('flex');
+            appView.classList.add('hidden');
+            history.replaceState(null, '', '#/register');
+        }
+        function showApp() {
+            loginView.classList.add('hidden');
+            registerView.classList.add('hidden');
+            appView.classList.remove('hidden');
+            history.replaceState(null, '', '#/app');
+        }
+
+        // Handle direct hash navigation (optional)
+        if (location.hash === '#/register') showRegister();
+        else showLogin();
+
+        if (goToRegister) goToRegister.addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+        if (goToLogin) goToLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+
+        // --- STATE (APP) ---
+        let state = {
+            currentUser: null,
+            currentView: 'dashboardView',
+            dashboardMode: 'board',
+            profileViewMode: 'grid',
+            calendarDate: new Date(),
+            activeProjectId: 1,
+            activeTodoListId: 1,
+            activeMilestoneProjectId: null,
+            activeTask: null,
+            activeTodoItem: null,
+            activeProfile: null,
+            isTaskModalOpen: false,
+            isTodoModalOpen: false,
+            isInfoModalOpen: false,
+            infoModalContent: { title: '', body: '' },
+            isMoveToProjectModalOpen: false,
+            isMilestoneModalOpen: false,
+            isProfileModalOpen: false,
+            isAiModalOpen: false,
+            activeMilestone: null,
+            itemToMove: null,
+            selectedTasksForAI: new Set(),
+            gridData: [
+                ['Task Name', 'Assignee', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Status'],
+                [{text:'API Endpoint Design', color:''}, {text:'John S.', color:''}, {text:'', color:'bg-green-500'}, {text:'', color:'bg-green-500'}, {text:'', color:'bg-yellow-500'}, {text:'', color:''}, {text:'', color:''}, {text:'In Progress', color:''}],
+                [{text:'Frontend UI Mockup', color:''}, {text:'Jane D.', color:''}, {text:'', color:''}, {text:'', color:''}, {text:'', color:''}, {text:'', color:''}, {text:'', color:''}, {text:'Pending', color:''}],
+            ],
+            projects: [
+                { id: 1, name: "NexusFlow App Dev", columns: [{ id: 1, title: 'Backlog', tasks: [{ id: 104, content: 'Design profile page', notes: 'Create wireframes in Figma.', priority: 'Low', subtasks: [], dueDate: '2025-10-15', assignee: null, links: 'https://figma.com/..', aiComm: { active: false, frequency: 'daily', days: [], prompt: '' } }, { id: 105, content: 'Setup CI/CD Pipeline', notes: '', priority: 'High', subtasks: [], dueDate: '2025-09-25', assignee: 'John Smith', links: '', aiComm: { active: false, frequency: 'daily', days: [], prompt: '' } }] }, {id: 2, title: 'Pending', tasks: []}, {id: 3, title: 'Assigned', tasks: []}, {id: 4, title: 'In Progress', tasks: []}, {id: 5, title: 'Waiting to Review', tasks: []}, {id: 6, title: 'Finished', tasks: []}], milestones: [{ id: 1, title: "Alpha Release", dueDate: "2025-12-01", description: "Core features implemented and ready for internal testing.", difficulty: "Hard", priority: "High" }] },
+                { id: 2, name: "Marketing Campaign", columns: [{ id: 7, title: 'Backlog', tasks: [] }, {id: 8, title: 'Pending', tasks: []}, {id: 9, title: 'Assigned', tasks: []}, {id: 10, title: 'In Progress', tasks: []}, {id: 11, title: 'Waiting to Review', tasks: []}, {id: 12, 'title': 'Finished', tasks: []}], milestones: [] }
+            ],
+            todoLists: [ { id: 1, name: "General Ideas", items: [{id: 201, content: "Integrate a real-time chat feature", description: "Use WebSockets for instant communication.", links: "https://socket.io", priority: 'High', dueDate: '', assignee: null, thingsToConsider: 'Scalability for many users.', subtasks: [{text: "Research libraries", done: true}, {text: "Create UI mockups", done: false}], createdAt: Date.now() }] } ],
+            users: [ { id: 1, name: 'John Smith', title: 'Backend Engineer', description: 'Specializes in Node.js and database architecture.', email: 'john.s@example.com', phone: '123-456-7890', linkedin: 'https://linkedin.com/in/johnsmith', github: 'https://github.com/johnsmith', languages: ['JavaScript', 'SQL', 'Python'], adminFeedback: 'Consistently delivers high-quality, scalable code.', avatar: '...' } ],
+            communicationLogs: [{id: 1, timestamp: "2025-09-15 10:30 AM", recipient: "John Smith", summary: "Update on task #103", message: "Hey John, just wanted to check on the progress for the API authentication endpoint. Let me know if you need any help."}]
+        };
+        const priorityStyles = { 'Low': 'bg-green-500/20 text-green-300', 'Medium': 'bg-yellow-500/20 text-yellow-300', 'High': 'bg-red-500/20 text-red-300', 'Urgent': 'bg-red-500/20 text-red-300' };
+
+        // ========== AUTH: LOGIN ==========
+        const loginForm = document.getElementById('loginForm');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+
+            const users = loadUsers();
+            const user = users.find(u => u.email.toLowerCase() === email && u.password === password);
+
+            if (!user) {
+                alert('Invalid email or password.');
+                return;
+            }
+
+            // Create simple session
+            setSession({ email: user.email, name: user.name, role: user.role || 'admin' });
+            state.currentUser = { email: user.email, role: user.role || 'admin', name: user.name };
+
+            document.getElementById('currentUserDisplay').innerHTML =
+              `<p class="font-semibold text-sm">${state.currentUser.name || 'User'}</p>
+               <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+
+            document.getElementById('commNavLink').style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+
+            showApp();
+            render();
+        });
+
+        // ========== AUTH: REGISTER ==========
+        const registerForm = document.getElementById('registerForm');
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('reg_name').value.trim();
+            const email = document.getElementById('reg_email').value.trim().toLowerCase();
+            const password = document.getElementById('reg_password').value;
+
+            // Basic validation
+            if (name.length < 2) return alert('Please enter your full name.');
+            const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            if (!emailOk) return alert('Please enter a valid email address.');
+            if (password.length < 6) return alert('Password must be at least 6 characters.');
+
+            const users = loadUsers();
+            if (users.some(u => u.email.toLowerCase() === email)) {
+                return alert('An account with this email already exists.');
+            }
+
+            // Create user (role default: member; feel free to change to 'admin')
+            const newUser = { name, email, password, role: 'member' };
+            users.push(newUser);
+            saveUsers(users);
+
+            // Auto-login then redirect to app
+            setSession({ email, name, role: newUser.role });
+            state.currentUser = { email, role: newUser.role, name };
+
+            document.getElementById('currentUserDisplay').innerHTML =
+              `<p class="font-semibold text-sm">${name}</p>
+               <p class="text-xs text-gray-400">${email} (${newUser.role})</p>`;
+
+            document.getElementById('commNavLink').style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+
+            showApp();
+            render();
+        });
+
+        // Try restore session
+        const existing = getSession();
+        if (existing) {
+            state.currentUser = { email: existing.email, role: existing.role || 'member', name: existing.name || 'User' };
+            document.getElementById('currentUserDisplay').innerHTML =
+              `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+               <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+            document.getElementById('commNavLink').style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+            showApp();
+            render();
+        }
+
+        // Logout
+        const logoutBtn = document.getElementById('logoutBtn');
+        logoutBtn.addEventListener('click', () => {
+            clearSession();
+            state.currentUser = null;
+            showLogin();
+        });
+
+        // --- MASTER RENDER FUNCTION ---
+        function render() {
+            if (!state.currentUser) return;
+            renderProjectsNav();
+            renderMainNavLinkStates();
+            renderMainContent();
+            renderModals();
+        }
+
+        // --- COMPONENT RENDER FUNCTIONS ---
+        function renderProjectsNav() {
+            const nav = document.getElementById('projectNav');
+            nav.innerHTML = state.projects.map(p => `<li><a href="#" data-project-id="${p.id}" class="project-link flex justify-between items-center px-4 py-2 rounded-lg ${p.id === state.activeProjectId && state.currentView === 'dashboardView' ? 'bg-gray-700 text-gray-200' : 'text-gray-400 hover:bg-gray-700/50'}"><span>${p.name}</span></a></li>`).join('');
+        }
+        function renderMainNavLinkStates() {
+            document.querySelectorAll('#mainNav .nav-link').forEach(l => {
+                l.classList.toggle('bg-gray-700', l.dataset.view === state.currentView);
+                l.classList.toggle('text-gray-200', l.dataset.view === state.currentView);
+            });
+        }
+        function renderMainContent() {
+            let content = '';
+            switch(state.currentView) {
+                case 'dashboardView': const p = state.projects.find(p => p.id === state.activeProjectId); if (p) { viewTitle.textContent = `${p.name} Dashboard`; content = renderDashboard(p); } break;
+                case 'todoView': viewTitle.textContent = 'To-Do Lists'; content = renderTodoView(); break;
+                case 'taskTrackingView': viewTitle.textContent = 'Task Tracking Matrix'; content = renderTaskTrackingView(); break;
+                case 'communicationView': viewTitle.textContent = 'Communication'; content = renderCommunicationView(); break;
+                case 'profileView': viewTitle.textContent = 'Developer Profiles'; content = renderProfileView(); break;
+                case 'milestonesView': viewTitle.textContent = 'Milestones'; content = renderMilestonesView(); break;
+            }
+            mainContent.innerHTML = content;
+            if (state.currentView === 'dashboardView') {
+                const project = state.projects.find(p => p.id === state.activeProjectId);
+                if (state.dashboardMode === 'table') renderTableView(project);
+                if (state.dashboardMode === 'calendar') renderCalendarView(project);
+            }
+            if (state.currentView === 'taskTrackingView') renderCsvAsGrid(state.gridData);
+        }
+
+        function renderDashboard(project) {
+            return `<div class="p-6 h-full flex flex-col">
+                <div class="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <button id="addTaskBtn" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all shadow-md hover:bg-cyan-600"><span class="material-icons-outlined">add</span>Add Task</button>
+                        <button id="aiAnalyzeBtn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all shadow-md hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled><span class="material-icons-outlined">psychology</span>Analyze & Assign</button>
+                    </div>
+                     <div class="bg-gray-800 p-1 rounded-lg flex items-center">
+                        <button data-mode="board" class="dashboard-mode-btn px-3 py-1 text-sm rounded-md ${state.dashboardMode === 'board' ? 'bg-cyan-500 text-white' : 'text-gray-400'}">Board</button>
+                        <button data-mode="table" class="dashboard-mode-btn px-3 py-1 text-sm rounded-md ${state.dashboardMode === 'table' ? 'bg-cyan-500 text-white' : 'text-gray-400'}">Table</button>
+                        <button data-mode="calendar" class="dashboard-mode-btn px-3 py-1 text-sm rounded-md ${state.dashboardMode === 'calendar' ? 'bg-cyan-500 text-white' : 'text-gray-400'}">Calendar</button>
+                    </div>
+                </div>
+                <div id="dashboardContent" class="h-full flex-grow">
+                     <div id="kanbanBoardView" class="h-full overflow-x-auto pb-4 ${state.dashboardMode === 'board' ? '' : 'hidden'}"><div class="flex gap-6 items-start h-full">${project.columns.map(col => createColumnHTML(col)).join('')}</div></div>
+                     <div id="kanbanTableView" class="h-full ${state.dashboardMode === 'table' ? '' : 'hidden'}"></div>
+                     <div id="kanbanCalendarView" class="h-full ${state.dashboardMode === 'calendar' ? '' : 'hidden'}"></div>
+                </div>
+            </div>`;
+        }
+        function createColumnHTML(col) {
+            const tasks = col.tasks || [];
+            return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full" data-column-id="${col.id}">
+                    <h3 class="font-bold text-lg text-cyan-300 mb-4">${col.title} (${tasks.length})</h3>
+                    <div class="tasks-container flex-grow space-y-4">${tasks.map(t => createTaskCardHTML(t)).join('')}</div>
+                </div>`;
+        }
+        function createTaskCardHTML(task) {
+            const assignee = state.users.find(u => u.name === task.assignee);
+            return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative">
+                    <input type="checkbox" class="task-checkbox absolute top-2 right-2 h-5 w-5 bg-gray-600 border-gray-500 rounded text-indigo-500" data-task-id="${task.id}">
+                    <div class="cursor-pointer task-content" data-task-id="${task.id}">
+                        <p class="font-medium pr-8">${task.content}</p>
+                        <div class="flex items-center justify-between mt-4 text-sm text-gray-400">
+                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority]}">${task.priority}</span>
+                            ${assignee ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">${assignee.name}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+        }
+        function renderTableView(project) {
+            const container = document.getElementById('kanbanTableView');
+            if(!container) return;
+            let table = `<table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
+                    <tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Status</th><th class="px-6 py-3">Priority</th><th class="px-6 py-3">Assignee</th><th class="px-6 py-3">Due Date</th></tr>
+                </thead><tbody>`;
+            project.columns.forEach(col => {
+                col.tasks.forEach(task => {
+                    const assignee = state.users.find(u => u.name === task.assignee);
+                    table += `<tr class="border-b border-gray-700"><td class="px-6 py-4 font-medium">${task.content}</td><td class="px-6 py-4">${col.title}</td><td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority]}">${task.priority}</span></td><td class="px-6 py-4">${assignee ? assignee.name : 'Unassigned'}</td><td class="px-6 py-4">${task.dueDate || 'N/A'}</td></tr>`;
+                });
+            });
+            table += `</tbody></table>`;
+            container.innerHTML = table;
+        }
+        function renderCalendarView(project) {
+            const container = document.getElementById('kanbanCalendarView');
+            if(!container) return;
+            const tasks = project.columns.flatMap(c => c.tasks);
+            const date = state.calendarDate;
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const monthName = date.toLocaleString('default', { month: 'long' });
+
+            let calendarHTML = `<div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-full flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <button id="prevMonthBtn">&lt;</button>
+                    <h3 class="text-xl font-bold">${monthName} ${year}</h3>
+                    <button id="nextMonthBtn">&gt;</button>
+                </div>
+                <div class="grid grid-cols-7 gap-px bg-gray-700 flex-grow">
+                    ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => `<div class="text-center font-semibold text-xs py-2 bg-gray-800">${day}</div>`).join('')}`;
+            
+            for (let i = 0; i < firstDay; i++) { calendarHTML += `<div class="bg-gray-800/50"></div>`; }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayTasks = tasks.filter(t => {
+                    if (!t.dueDate) return false;
+                    const taskDate = new Date(t.dueDate);
+                    return taskDate.getFullYear() === year && taskDate.getMonth() === month && taskDate.getDate() === day;
+                });
+                calendarHTML += `<div class="bg-gray-800 p-2 calendar-day overflow-y-auto"><div class="font-semibold text-right text-sm">${day}</div><div class="space-y-1 mt-1">
+                    ${dayTasks.map(t => `<div class="text-xs bg-cyan-600 p-1 rounded cursor-pointer task-content" data-task-id="${t.id}">${t.content}</div>`).join('')}
+                </div></div>`;
+            }
+            calendarHTML += `</div></div>`;
+            container.innerHTML = calendarHTML;
+        }
+
+        function renderTodoView() {
+            const activeList = state.todoLists.find(l => l.id === state.activeTodoListId);
+            return `<div class="p-6">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold">To-Do Lists</h2></div>
+                <div class="flex gap-6">
+                    <div class="w-1/4">
+                        <h3 class="font-semibold mb-4">My Lists</h3>
+                        <ul id="todoListsContainer" class="space-y-2">${state.todoLists.map(l => `<a href="#" data-list-id="${l.id}" class="block p-2 rounded-lg ${l.id === state.activeTodoListId ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-gray-700'}">${l.name}</a>`).join('')}</ul>
+                        <button id="addNewListBtn" class="w-full mt-4 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg">+ New List</button>
+                    </div>
+                    <div class="w-3/4"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${activeList.name}</h3><button id="addNewTodoItemBtn" class="bg-cyan-500 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"><span class="material-icons-outlined">add</span>Add Item to List</button></div><div class="space-y-3">${activeList.items.map(item => `
+                    <div class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700/50" data-item-id="${item.id}">
+                        <div class="flex justify-between items-center"><p>${item.content}</p><button data-item-id="${item.id}" class="move-to-project-btn text-xs bg-cyan-600 hover:bg-cyan-700 p-1 rounded">Move to Project</button></div>
+                        ${item.subtasks && item.subtasks.length > 0 ? `<div class="mt-2 flex flex-wrap gap-1">${item.subtasks.map(st => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${st.text}</span>`).join('')}</div>` : ''}
+                    </div>`).join('')}</div></div>
+                </div>
+            </div>`;
+        }
+        function renderTaskTrackingView() {
+             return `<div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2"><h2 class="text-2xl font-bold">Task Tracking Matrix</h2><span class="info-btn text-gray-500 cursor-pointer" data-info="taskTracking">info</span></div>
+                    <div class="flex gap-2">
+                         <label class="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 px-3 rounded-lg flex items-center gap-2 cursor-pointer"><span class="material-icons-outlined">upload</span>Import CSV<input type="file" id="importMatrixCsvInput" class="hidden" accept=".csv"></label>
+                         <button id="exportMatrixCsvBtn" class="text-sm bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">download</span>Export CSV</button>
+                         <button id="exportMatrixPdfBtn" class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">picture_as_pdf</span>Export PDF</button>
+                    </div>
+                </div>
+                <div id="csvGrid" class="bg-gray-800 p-4 rounded-xl border border-gray-700 overflow-auto"></div>
+            </div>`;
+        }
+        function renderCsvAsGrid(data) {
+            const container = document.getElementById('csvGrid');
+            if (!container) return;
+            if (!data || data.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-center">Upload a CSV file to begin tracking tasks.</p>`;
+                return;
+            }
+            let table = '<table id="csvGridTable" class="w-full">';
+            table += '<thead><tr>' + data[0].map(header => `<th>${header}</th>`).join('') + '</tr></thead>';
+            table += '<tbody>';
+            data.slice(1).forEach((row, rowIndex) => {
+                table += '<tr>' + row.map((cell, cellIndex) => `<td contenteditable="true" class="${cell.color || ''}" data-row="${rowIndex+1}" data-col="${cellIndex}">${cell.text}</td>`).join('') + '</tr>';
+            });
+            table += '</tbody></table>';
+            container.innerHTML = table;
+        }
+        function renderProfileView() {
+            let content = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold">Developer Profiles</h2><button id="addNewProfileBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>Add New Profile</button></div>`;
+            if (state.activeProfile) {
+                const p = state.activeProfile;
+                content = `<button id="backToProfilesBtn" class="text-gray-400 hover:text-white mb-4">&larr; Back to List</button>
+                <div class="bg-gray-800 p-8 rounded-xl border border-gray-700">
+                    <h2 class="text-2xl font-bold">${p.name}</h2><p class="text-cyan-400">${p.title}</p>
+                    <div class="mt-4"><strong class="text-gray-400">Description:</strong> <p>${p.description}</p></div>
+                    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                        <p><strong class="text-gray-400">Email:</strong> ${p.email}</p><p><strong class="text-gray-400">Phone:</strong> ${p.phone}</p>
+                        <p><strong class="text-gray-400">LinkedIn:</strong> <a href="${p.linkedin}" class="text-cyan-400 hover:underline" target="_blank">${p.linkedin}</a></p>
+                        <p><strong class="text-gray-400">GitHub:</strong> <a href="${p.github}" class="text-cyan-400 hover:underline" target="_blank">${p.github}</a></p>
+                    </div>
+                    <div class="mt-4"><strong class="text-gray-400">Coding Languages:</strong><div class="flex flex-wrap gap-2 mt-1">${p.languages.map(l => `<span class="bg-gray-700 text-cyan-300 text-xs font-medium px-2 py-1 rounded-full">${l}</span>`).join('')}</div></div>
+                    <div class="mt-4"><strong class="text-gray-400">Admin Feedback:</strong> <p class="bg-gray-900/50 p-2 rounded-lg">${p.adminFeedback}</p></div>
+                    <div class="mt-4"><button class="text-sm bg-gray-700 p-2 rounded-lg">View Resume</button></div>
+                </div>`;
+            } else {
+                content += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${state.users.map(u => createProfileCardHTML(u)).join('')}</div>`;
+            }
+            return `<div class="p-6 max-w-5xl mx-auto">${content}</div>`;
+        }
+        function createProfileCardHTML(user) {
+            return `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <h3 class="font-bold text-lg">${user.name}</h3>
+                <p class="text-sm text-cyan-400">${user.title}</p>
+                <div class="mt-2 flex flex-wrap gap-1">${user.languages.slice(0,3).map(l => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${l}</span>`).join('')}</div>
+                <button data-user-id="${user.id}" class="view-profile-btn text-sm text-cyan-400 hover:underline mt-4">View Details</button>
+            </div>`;
+        }
+        function renderCommunicationView() {
+            if (state.currentUser.role !== 'admin') {
+                return `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
+            }
+            const activeComms = state.projects.flatMap(p => p.columns.flatMap(c => c.tasks)).filter(t => t.aiComm && t.aiComm.active);
+            return `<div class="p-6"><h2 class="text-2xl font-bold mb-6">Active AI Communications</h2><div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8"><table class="w-full text-sm text-left"><thead class="text-xs text-gray-400 uppercase bg-gray-700/50"><tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Developer</th><th class="px-6 py-3">Frequency</th><th class="px-6 py-3">Days</th><th class="px-6 py-3">Next Message</th></tr></thead><tbody>${activeComms.map(task => createCommRowHTML(task)).join('') || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}</tbody></table></div><h2 class="text-2xl font-bold mb-6">Recent Message Logs</h2><div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-gray-400 uppercase bg-gray-700/50"><tr><th class="px-6 py-3">Timestamp</th><th class="px-6 py-3">Recipient</th><th class="px-6 py-3">Summary</th></tr></thead><tbody>${state.communicationLogs.map(log => `<tr class="border-b border-gray-700"><td class="px-6 py-4">${log.timestamp}</td><td class="px-6 py-4">${log.recipient}</td><td class="px-6 py-4">${log.summary}</td></tr>`).join('') || '<tr><td colspan="3" class="text-center p-4 text-gray-500">No messages logged yet.</td></tr>'}</tbody></table></div></div>`;
+        }
+        function createCommRowHTML(task) { return `<tr class="border-b border-gray-700"><td class="px-6 py-4">${task.content}</td><td class="px-6 py-4">${task.assignee || 'Unassigned'}</td><td class="px-6 py-4">${task.aiComm.frequency}</td><td class="px-6 py-4">${(task.aiComm.days||[]).join(', ')}</td><td class="px-6 py-4">Tomorrow 9:00 AM</td></tr>`; }
+        function renderMilestonesView() {
+            let content = '';
+            if (state.activeMilestoneProjectId === null) {
+                content = `<div class="p-6">
+                    <h2 class="text-2xl font-bold mb-4">Select a project to view its milestones</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${state.projects.map(p => `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700 cursor-pointer hover:border-cyan-500 milestone-project-card" data-project-id="${p.id}">
+                            <h3 class="font-bold text-lg">${p.name}</h3>
+                            <p class="text-sm text-gray-400">${p.milestones.length} milestones</p>
+                        </div>`).join('')}
+                    </div>
+                </div>`;
+            } else {
+                const project = state.projects.find(p => p.id === state.activeMilestoneProjectId);
+                content = `<div class="p-6 max-w-4xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex items-center gap-4">
+                             <button id="backToProjectsBtn" class="text-gray-400 hover:text-white">&larr;</button>
+                             <div class="flex items-center gap-2"><h2 class="text-2xl font-bold">${project.name} Milestones</h2><span class="info-btn text-gray-500 cursor-pointer" data-info="milestones">info</span></div>
+                        </div>
+                        <button id="addMilestoneBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>New Milestone</button>
+                    </div>
+                    <div class="relative border-l-2 border-gray-700 pl-8 space-y-12">${project.milestones.map(m => createMilestoneHTML(m)).join('') || '<p class="text-gray-500">No milestones for this project yet.</p>'}</div>
+                </div>`;
+            }
+            return content;
+        }
+        function createMilestoneHTML(milestone) {
+            const difficultyColors = { 'Easy': 'text-green-400', 'Medium': 'text-yellow-400', 'Hard': 'text-red-400' };
+            const priorityColors = { 'Low': 'bg-green-500/20', 'Medium': 'bg-yellow-500/20', 'High': 'bg-red-500/20' };
+             return `<div class="mb-8"><div class="absolute -left-3.5 mt-1.5 h-6 w-6 rounded-full bg-cyan-500 border-4 border-gray-800"></div>
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                        <div class="flex justify-between items-start"><div><h3 class="text-xl font-bold">${milestone.title}</h3><p class="text-sm text-gray-400 mt-1">Due: ${milestone.dueDate}</p></div>
+                            <div class="flex gap-2 text-xs font-semibold"><span class="${difficultyColors[milestone.difficulty]}">${milestone.difficulty}</span><span class="px-2 py-1 rounded-full ${priorityColors[milestone.priority]}">${milestone.priority}</span></div>
+                        </div><p class="mt-2 text-gray-300">${milestone.description}</p>
+                    </div></div>`;
+        }
+
+        // --- MODAL RENDERER ---
+        function renderModals() {
+            modalsContainer.innerHTML = '';
+            if (state.isTaskModalOpen) modalsContainer.innerHTML += createTaskModalHTML();
+            if (state.isTodoModalOpen) modalsContainer.innerHTML += createTodoModalHTML();
+            if (state.isMoveToProjectModalOpen) modalsContainer.innerHTML += createMoveToProjectModalHTML();
+            if (state.isInfoModalOpen) modalsContainer.innerHTML += createInfoModalHTML();
+            if (state.isMilestoneModalOpen) modalsContainer.innerHTML += createMilestoneModalHTML();
+            if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
+            if (state.isAiModalOpen) modalsContainer.innerHTML += createAiModalHTML();
+        }
+        function createTaskModalHTML() {
+            const task = state.activeTask;
+            const isNew = !task;
+            const taskData = isNew ? { content: '', notes: '', priority: 'Medium', dueDate: '', assignee: null, subtasks: [], links: '', aiComm: { active: false, frequency: 'daily', days: [], prompt: '' } } : task;
+            return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+                <form id="taskForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-700">
+                    <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? 'Create Task' : 'Edit Task'}</h2></div>
+                    <div class="p-6 flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 space-y-4">
+                            <input class="w-full bg-gray-700 p-2 rounded-lg" type="text" name="content" value="${taskData.content}" placeholder="Task Title..." required>
+                            <textarea class="w-full bg-gray-700 p-2 rounded-lg h-24" name="notes" placeholder="Add notes...">${taskData.notes}</textarea>
+                            <input class="w-full bg-gray-700 p-2 rounded-lg" type="text" name="links" value="${taskData.links || ''}" placeholder="Add a link...">
+                             <div class="p-4 bg-gray-900/50 rounded-lg"><div class="flex items-center justify-between mb-2"><div class="flex items-center gap-2"><h4 class="font-semibold">AI Automated Communication</h4><span class="info-btn text-gray-500 cursor-pointer" data-info="aiComm">info</span></div><label><div class="relative inline-block w-10 mr-2 align-middle select-none"><input type="checkbox" name="ai_active" id="ai_toggle" class="toggle-checkbox w-12 h-6 transition duration-200 ease-in-out bg-gray-600 rounded-full appearance-none cursor-pointer before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:left-1 before:top-1 before:transition-all" ${taskData.aiComm.active ? 'checked' : ''}/></div></label></div><div class="${taskData.aiComm.active ? '' : 'hidden'}"><select class="w-full bg-gray-700 p-2 rounded-lg mb-2" name="ai_frequency"><option>daily</option><option>weekly</option></select><div class="flex gap-2 mb-2">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? 'checked' : ''}> ${d}</label>`).join('')}</div><textarea name="ai_prompt" class="w-full bg-gray-700 p-2 rounded-lg h-20" placeholder="What should the AI ask? e.g., 'Any blockers? What's your estimated completion?'">${taskData.aiComm.prompt}</textarea></div></div>
+                        </div>
+                        <div class="space-y-4"><input class="w-full bg-gray-700 p-2 rounded-lg" type="date" name="dueDate" value="${taskData.dueDate}"><select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg"><option value="">Unassigned</option>${state.users.map(u=>`<option value="${u.name}" ${taskData.assignee === u.name ? 'selected':''}>${u.name}</option>`).join('')}<option value="add_new">-- Add New --</option></select></div>
+                    </div>
+                    <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button type="submit" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg">Save</button></div>
+                </form></div>`;
+        }
+        function createTodoModalHTML() {
+            const item = state.activeTodoItem;
+            const isNew = !item;
+            const data = isNew ? { content: "", description: "", links: "", priority: 'Medium', dueDate: '', assignee: null, thingsToConsider: '', subtasks: []} : item;
+            return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+                <form id="todoForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700">
+                    <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? 'Add' : 'Edit'} To-Do Item</h2></div>
+                    <div class="p-6 flex-grow space-y-4 overflow-y-auto max-h-[60vh]">
+                        <input type="text" name="content" value="${data.content}" class="w-full text-lg font-semibold bg-gray-700 rounded-lg p-2" placeholder="Item content..." required>
+                        <textarea name="description" class="w-full bg-gray-700 p-2 rounded-lg h-24" placeholder="Description...">${data.description}</textarea>
+                        <input type="text" name="links" value="${data.links}" placeholder="https://example.com" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <textarea name="thingsToConsider" class="w-full bg-gray-700 p-2 rounded-lg h-20" placeholder="Things to consider...">${data.thingsToConsider}</textarea>
+                        <div class="grid grid-cols-2 gap-4"><select name="priority" class="w-full bg-gray-700 p-2 rounded-lg">${Object.keys(priorityStyles).map(p => `<option ${data.priority === p ? 'selected':''}>${p}</option>`).join('')}</select><input type="date" name="dueDate" value="${data.dueDate}" class="w-full bg-gray-700 p-2 rounded-lg"></div>
+                        <select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg"><option value="">Unassigned</option>${state.users.map(u=>`<option value="${u.name}" ${data.assignee === u.name ? 'selected':''}>${u.name}</option>`).join('')}</select>
+                    </div>
+                    <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button type="submit" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg">Save Item</button></div>
+                </form>
+            </div>`;
+        }
+        function createMoveToProjectModalHTML() {
+            return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
+                    <div class="p-6">
+                        <h3 class="font-semibold mb-4">Move to which project's backlog?</h3>
+                        <select id="projectSelectDropdown" class="w-full bg-gray-700 p-2 rounded-lg">${state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+                        <div class="flex justify-end gap-4 mt-4"><button type="button" class="close-modal-btn bg-gray-600 p-2 rounded-lg text-sm">Cancel</button><button id="confirmMoveBtn" class="bg-cyan-600 p-2 rounded-lg text-sm">Confirm</button></div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        function createInfoModalHTML() {
+             return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
+                    <div class="p-6 border-b border-gray-700 flex justify-between items-center"><h2 class="text-xl font-bold">${state.infoModalContent.title}</h2><button class="close-modal-btn text-gray-400 hover:text-white">&times;</button></div>
+                    <div class="p-6 text-gray-300 space-y-2">${state.infoModalContent.body}</div>
+                </div>
+            </div>`;
+        }
+        function createMilestoneModalHTML() {
+            const milestone = state.activeMilestone;
+            const isNew = !milestone;
+            const data = isNew ? { title: '', description: '', dueDate: '', priority: 'Medium', difficulty: 'Medium' } : milestone;
+            return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+                <form id="milestoneForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
+                    <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? 'Create' : 'Edit'} Milestone</h2></div>
+                    <div class="p-6 flex-grow space-y-4">
+                        <input name="title" value="${data.title}" placeholder="Milestone Title" class="w-full bg-gray-700 p-2 rounded-lg" required>
+                        <textarea name="description" placeholder="Description" class="w-full bg-gray-700 p-2 rounded-lg h-24">${data.description}</textarea>
+                        <input name="dueDate" type="date" value="${data.dueDate}" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <div class="grid grid-cols-2 gap-4">
+                            <select name="priority" class="w-full bg-gray-700 p-2 rounded-lg"><option>Low</option><option selected>Medium</option><option>High</option></select>
+                            <select name="difficulty" class="w-full bg-gray-700 p-2 rounded-lg"><option>Easy</option><option selected>Medium</option><option>Hard</option></select>
+                        </div>
+                    </div>
+                    <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save</button></div>
+                </form>
+            </div>`;
+        }
+        function createProfileModalHTML() {
+             return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+                <form id="profileForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700">
+                    <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">Add New Developer Profile</h2></div>
+                    <div class="p-6 flex-grow space-y-4 overflow-y-auto max-h-[60vh]">
+                        <input name="name" placeholder="Full Name" class="w-full bg-gray-700 p-2 rounded-lg" required>
+                        <input name="title" placeholder="Job Title" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <textarea name="description" placeholder="Description..." class="w-full bg-gray-700 p-2 rounded-lg h-20"></textarea>
+                        <input name="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <input name="phone" type="tel" placeholder="Phone" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <input name="linkedin" type="url" placeholder="LinkedIn URL" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <input name="github" type="url" placeholder="GitHub URL" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <input name="languages" placeholder="Coding Languages (comma-separated)" class="w-full bg-gray-700 p-2 rounded-lg">
+                        <textarea name="adminFeedback" placeholder="Admin Feedback..." class="w-full bg-gray-700 p-2 rounded-lg h-20"></textarea>
+                         <div><label class="block text-sm font-medium text-gray-400 mb-1">Resume</label><input type="file" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500/10 file:text-cyan-300 hover:file:bg-cyan-500/20"></div>
+                    </div>
+                    <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save Profile</button></div>
+                </form>
+            </div>`;
+        }
+        function createAiModalHTML() {
+            let content = '';
+            state.selectedTasksForAI.forEach(taskId => {
+                const task = findTaskById(taskId);
+                if(task) {
+                    content += `<div class="bg-gray-700 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg">${task.content}</h4>
+                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-gray-800 p-3 rounded-lg border-2 border-green-500"><p class="font-semibold">Top Recommendation: John Smith</p><p class="text-sm text-gray-400 mt-1">Reason: John's skills in Node.js and PostgreSQL are a perfect match for this backend task.</p></div>
+                            <div class="bg-gray-800 p-3 rounded-lg border border-gray-600"><p class="font-semibold">Second Choice: Alex Ray</p><p class="text-sm text-gray-400 mt-1">Reason: Alex has full-stack experience and can handle the task if John is unavailable.</p></div>
+                        </div>
+                    </div>`;
+                }
+            });
+            return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-700">
+                    <div class="p-6 border-b border-gray-700 flex justify-between items-center"><h2 class="text-2xl font-bold">AI Assignment Suggestions</h2><button class="close-modal-btn text-gray-400 hover:text-white">&times;</button></div>
+                    <div class="p-6 max-h-[60vh] overflow-y-auto space-y-4">${content}</div>
+                    <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Close</button><button class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg">Accept & Assign</button></div>
+                </div>
+            </div>`;
+        }
+
+        // --- EVENT HANDLERS (APP) ---
+        document.body.addEventListener('click', e => {
+            const target = e.target;
+            // Sidebar Navigation
+            const navLink = target.closest('.nav-link');
+            const projectLink = target.closest('.project-link');
+            if (navLink) { state.currentView = navLink.dataset.view; if(navLink.dataset.view === 'milestonesView') state.activeMilestoneProjectId = null; render(); }
+            if (projectLink) { state.activeProjectId = parseInt(projectLink.dataset.projectId); state.currentView = 'dashboardView'; render(); }
+            
+            // Other buttons...
+            if (target.id === 'addNewListBtn') { const name = prompt("New list name:"); if(name) state.todoLists.push({id: Date.now(), name, items: []}); render(); }
+            if (target.id === 'addNewProjectBtn') { const name = prompt("New project name:"); if(name) state.projects.push({id: Date.now(), name, columns: [{id:Date.now(), title:'Backlog', tasks:[]}, {id:Date.now()+1, title:'Pending', tasks:[]}, {id:Date.now()+2, title:'Assigned', tasks:[]}, {id:Date.now()+3, title:'In Progress', tasks:[]}, {id:Date.now()+4, title:'Waiting to Review', tasks:[]}, {id:Date.now()+5, title:'Finished', tasks:[]}], milestones:[]}); render(); }
+            if (target.id === 'addNewTodoItemBtn') { state.isTodoModalOpen = true; state.activeTodoItem = null; render(); }
+            if (target.id === 'addTaskBtn') { state.isTaskModalOpen = true; state.activeTask = null; render(); }
+            if (target.closest('.move-to-project-btn')) { state.itemToMove = parseInt(target.closest('[data-item-id]').dataset.itemId); state.isMoveToProjectModalOpen = true; render(); }
+            if (target.id === 'confirmMoveBtn') {
+                const targetProjectId = parseInt(document.getElementById('projectSelectDropdown').value);
+                const project = state.projects.find(p => p.id === targetProjectId);
+                const activeList = state.todoLists.find(l => l.id === state.activeTodoListId);
+                const itemIndex = activeList.items.findIndex(i => i.id === state.itemToMove);
+                if (project && itemIndex > -1) {
+                    const [item] = activeList.items.splice(itemIndex, 1);
+                    project.columns[0].tasks.push({ id: Date.now(), content: item.content, notes: item.description, ...item });
+                }
+                state.isMoveToProjectModalOpen = false; render();
+            }
+            if(target.closest('.close-modal-btn')) { state.isTaskModalOpen=false; state.isTodoModalOpen=false; state.isMoveToProjectModalOpen=false; state.isInfoModalOpen=false; state.isMilestoneModalOpen=false; state.isProfileModalOpen=false; state.isAiModalOpen=false; render(); }
+            if (target.id === 'aiAnalyzeBtn') { state.isAiModalOpen = true; render(); }
+            const taskContent = target.closest('.task-content');
+            if(taskContent) {
+                const taskId = parseInt(taskContent.dataset.taskId);
+                const project = state.projects.find(p => p.id === state.activeProjectId);
+                for(const col of project.columns) {
+                    const task = col.tasks.find(t => t.id === taskId);
+                    if(task) { state.activeTask = task; state.isTaskModalOpen = true; render(); break;}
+                }
+            }
+            const infoBtn = target.closest('.info-btn');
+            if (infoBtn) {
+                const infoKey = infoBtn.dataset.info;
+                if(infoKey === 'milestones') state.infoModalContent = { title: 'Milestone Planning Tips', body: '<p>Good milestones are S.M.A.R.T: Specific, Measurable, Achievable, Relevant, and Time-bound. They represent major achievements in your project, not small tasks.</p>' };
+                if(infoKey === 'taskTracking') state.infoModalContent = { title: 'Task Tracking Matrix', body: '<p>Upload a CSV to see it as a grid. You can write in any cell to update it, or right-click a cell to set a color-coded status.</p>' };
+                if(infoKey === 'aiComm') state.infoModalContent = { title: 'AI Automated Communication', body: '<p>When activated, the AI will automatically message the assigned developer based on your schedule to ask for updates using your custom prompt.</p>' };
+                state.isInfoModalOpen = true;
+                render();
+            }
+            const viewProfileBtn = target.closest('.view-profile-btn');
+            if(viewProfileBtn) { state.activeProfile = state.users.find(u => u.id === parseInt(viewProfileBtn.dataset.userId)); render(); }
+            if(target.id === 'backToProfilesBtn') { state.activeProfile = null; render(); }
+            if (target.id === 'addNewProfileBtn') { state.isProfileModalOpen = true; state.activeProfile = null; render(); }
+            const milestoneProjectCard = target.closest('.milestone-project-card');
+            if(milestoneProjectCard) { state.activeMilestoneProjectId = parseInt(milestoneProjectCard.dataset.projectId); render(); }
+            if(target.id === 'backToProjectsBtn') { state.activeMilestoneProjectId = null; render(); }
+            if(target.id === 'addMilestoneBtn') { state.isMilestoneModalOpen = true; state.activeMilestone = null; render(); }
+            
+            // Dashboard mode switcher
+            const modeBtn = target.closest('.dashboard-mode-btn');
+            if(modeBtn) { state.dashboardMode = modeBtn.dataset.mode; render(); }
+            if(target.id === 'prevMonthBtn') { state.calendarDate.setMonth(state.calendarDate.getMonth() - 1); render(); }
+            if(target.id === 'nextMonthBtn') { state.calendarDate.setMonth(state.calendarDate.getMonth() + 1); render(); }
+        });
+        document.body.addEventListener('change', e => {
+            if (e.target.matches('.task-checkbox')) {
+                const taskId = parseInt(e.target.dataset.taskId);
+                if (e.target.checked) state.selectedTasksForAI.add(taskId);
+                else state.selectedTasksForAI.delete(taskId);
+                const analyzeBtn = document.getElementById('aiAnalyzeBtn');
+                if(analyzeBtn) analyzeBtn.disabled = state.selectedTasksForAI.size === 0;
+            }
+        });
+        document.body.addEventListener('submit', e => {
+             if (e.target.id === 'taskForm') {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                const taskData = { content: data.content, notes: data.notes, assignee: data.assignee, links: data.links, dueDate: data.dueDate, priority: data.priority, aiComm: { active: data.ai_active === 'on', frequency: data.ai_frequency, days: formData.getAll('ai_days'), prompt: data.ai_prompt } };
+                if(state.activeTask) { Object.assign(state.activeTask, taskData); } 
+                else {
+                    const project = state.projects.find(p => p.id === state.activeProjectId);
+                    project.columns[0].tasks.push({id: Date.now(), subtasks: [], ...taskData });
+                }
+                state.isTaskModalOpen = false;
+                render();
+            }
+             if (e.target.id === 'todoForm') {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                 const activeList = state.todoLists.find(l => l.id === state.activeTodoListId);
+                if (state.activeTodoItem) {
+                    Object.assign(state.activeTodoItem, data);
+                } else {
+                    activeList.items.push({ id: Date.now(), ...data, subtasks: [], createdAt: Date.now() });
+                }
+                state.isTodoModalOpen = false;
+                render();
+            }
+            if (e.target.id === 'milestoneForm') {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                const project = state.projects.find(p => p.id === state.activeMilestoneProjectId);
+                if(project) {
+                    project.milestones.push({ id: Date.now(), ...data });
+                }
+                state.isMilestoneModalOpen = false;
+                render();
+            }
+            if(e.target.id === 'profileForm') {
+                 e.preventDefault();
+                 const formData = new FormData(e.target);
+                 const data = Object.fromEntries(formData.entries());
+                 state.users.push({id: Date.now(), languages: data.languages.split(',').map(s => s.trim()).filter(Boolean), ...data});
+                 state.isProfileModalOpen = false;
+                 render();
+            }
+        });
+        
+        // --- HELPERS ---
+        function findTaskById(taskId) { for (const p of state.projects) { for (const c of p.columns) { const t = c.tasks.find(t => t.id === taskId); if(t) return t; } } return null; }
+        
+        // --- INITIALIZATION ---
+        // Render is called on login/register (after showApp)
+    });
+    </script>
+</body>
+</html>
