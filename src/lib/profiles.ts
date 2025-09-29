@@ -1,36 +1,102 @@
 import { query } from "@/lib/db";
 
-type ListParams = {
+/** Row shape in DB */
+export type ProfileRow = {
+  id: number;
+  user_id: number | null;
+  full_name: string;
+  title: string | null;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  github_url: string | null;
+  languages: string[];
+  admin_feedback: string | null;
+  resume_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ListParams = {
   q?: string;
   page?: number;
   limit?: number;
 };
 
-export async function listProfiles({ q, page = 1, limit = 20 }: ListParams) {
+export type CreateProfileInput = {
+  userId?: number | null;
+  fullName: string;
+  title?: string | null;
+  description?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  languages?: string[];
+  adminFeedback?: string | null;
+  resumeUrl?: string | null;
+};
+
+export type UpdateProfileInput = Partial<CreateProfileInput>;
+
+/**
+ * listProfiles – supports two call styles:
+ *  - listProfiles({ q?, page?, limit? })
+ *  - listProfiles(page?: number, limit?: number)  // backward-compat
+ */
+export function listProfiles(page?: number, limit?: number): Promise<ProfileRow[]>;
+export function listProfiles(params?: ListParams): Promise<ProfileRow[]>;
+export async function listProfiles(a?: number | ListParams, b?: number): Promise<ProfileRow[]> {
+  let q: string | undefined;
+  let page = 1;
+  let limit = 20;
+
+  if (typeof a === "object" || a === undefined) {
+    q = a?.q?.trim() || undefined;
+    page = a?.page ?? 1;
+    limit = a?.limit ?? 20;
+  } else {
+    page = a ?? 1;
+    limit = b ?? 20;
+  }
+
   const offset = (page - 1) * limit;
+
   const params: any[] = [];
   let where = "";
 
-  if (q && q.trim()) {
-    params.push(`%${q}%`);
-    where = `WHERE full_name ILIKE $${params.length} OR coalesce(title,'') ILIKE $${params.length} OR coalesce(email,'') ILIKE $${params.length}`;
+  if (q) {
+    // push q three times for the three ILIKEs
+    params.push(`%${q}%`); const p1 = params.length;
+    params.push(`%${q}%`); const p2 = params.length;
+    params.push(`%${q}%`); const p3 = params.length;
+    where = `
+      WHERE full_name ILIKE $${p1}
+         OR COALESCE(title,'') ILIKE $${p2}
+         OR COALESCE(email,'') ILIKE $${p3}
+    `;
   }
 
-  const { rows } = await query(
+  // Use parameterized limit/offset to be tidy
+  params.push(limit); const pLimit = params.length;
+  params.push(offset); const pOffset = params.length;
+
+  const { rows } = await query<ProfileRow>(
     `SELECT id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
             languages, admin_feedback, resume_url, created_at, updated_at
        FROM profiles
        ${where}
        ORDER BY id DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-    params.length ? [...params, ...params.slice(-1)] : []
+       LIMIT $${pLimit} OFFSET $${pOffset}`,
+    params
   );
 
   return rows;
 }
 
 export async function getProfile(id: number) {
-  const { rows } = await query(
+  const { rows } = await query<ProfileRow>(
     `SELECT id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
             languages, admin_feedback, resume_url, created_at, updated_at
        FROM profiles
@@ -40,8 +106,8 @@ export async function getProfile(id: number) {
   return rows[0] ?? null;
 }
 
-export async function createProfile(data: any) {
-  const { rows } = await query(
+export async function createProfile(data: CreateProfileInput) {
+  const { rows } = await query<ProfileRow>(
     `INSERT INTO profiles
       (user_id, full_name, title, description, email, phone, linkedin_url, github_url,
        languages, admin_feedback, resume_url)
@@ -65,8 +131,8 @@ export async function createProfile(data: any) {
   return rows[0];
 }
 
-export async function updateProfile(id: number, data: any) {
-  const { rows } = await query(
+export async function updateProfile(id: number, data: UpdateProfileInput) {
+  const { rows } = await query<ProfileRow>(
     `UPDATE profiles SET
         user_id        = COALESCE($1, user_id),
         full_name      = COALESCE($2, full_name),

@@ -63,7 +63,7 @@ export const profileCreateSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   title: z.string().trim().optional().nullable(),
   description: z.string().trim().optional().nullable(),
-  email: z.string().email("Invalid email").optional().nullable(),
+  email: z.string().email().optional().nullable(),
   phone: z.string().trim().optional().nullable(),
   linkedinUrl: z.string().url().optional().nullable(),
   githubUrl: z.string().url().optional().nullable(),
