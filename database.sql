@@ -132,21 +132,58 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- Developer profiles (one per person; may or may not map to an auth user)
 CREATE TABLE IF NOT EXISTS profiles (
-  id            BIGSERIAL PRIMARY KEY,
-  user_id       BIGINT REFERENCES users(id) ON DELETE SET NULL, -- optional link to auth user
-  full_name     TEXT NOT NULL,
-  title         TEXT,
-  description   TEXT,
-  email         TEXT,
-  phone         TEXT,
-  linkedin_url  TEXT,
-  github_url    TEXT,
-  languages     TEXT[] DEFAULT '{}',       -- e.g. '{JavaScript,SQL,Python}'
-  admin_feedback TEXT,
-  resume_url    TEXT,                      -- path/URL to uploaded resume (PDF, etc.)
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NULL,
+  full_name TEXT NOT NULL,
+  title TEXT NULL,
+  description TEXT NULL,
+  email TEXT NULL,
+  phone TEXT NULL,
+  linkedin_url TEXT NULL,
+  github_url TEXT NULL,
+  languages TEXT[] DEFAULT '{}',
+  admin_feedback TEXT NULL,
+  resume_url TEXT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_profiles_fullname ON profiles (full_name);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
+
+-- To-Do Lists (idempotent creates)
+CREATE TABLE IF NOT EXISTS todo_users (
+  id TEXT PRIMARY KEY,                -- matches your auth user id / email / uuid
+  email TEXT,
+  name TEXT
+);
+
+CREATE TABLE IF NOT EXISTS todo_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ownerId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  FOREIGN KEY (ownerId) REFERENCES todo_users(id)
+);
+
+CREATE TABLE IF NOT EXISTS todo_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  listId INTEGER NOT NULL,
+  ownerId TEXT NOT NULL,              -- denormalized for quick filtering
+  content TEXT NOT NULL,
+  description TEXT,
+  link TEXT,
+  considerations TEXT,
+  priority TEXT CHECK(priority IN ('Low','Medium','High')) DEFAULT 'Medium',
+  dueDate TEXT,                       -- ISO date string
+  assigneeId TEXT,                    -- optional user id
+  tags TEXT DEFAULT '[]',             -- JSON array of strings
+  status TEXT CHECK(status IN ('open','done','archived')) DEFAULT 'open',
+  position INTEGER DEFAULT 0,         -- for manual ordering
+  projectId INTEGER,                  -- if "moved to project" (optional)
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  FOREIGN KEY (listId) REFERENCES todo_lists(id)
+);
