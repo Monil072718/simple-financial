@@ -22,137 +22,51 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-      body {
-        font-family: "Inter", sans-serif;
-      }
-      .material-icons-outlined {
-        font-size: 20px;
-      }
-      .modal-content {
-        animation: slideUp 0.3s ease-out forwards;
-      }
-      @keyframes slideUp {
-        from {
-          transform: translateY(20px);
-          opacity: 0;
-        }
-        to {
-          transform: translateY(0);
-          opacity: 1;
-        }
-      }
-      .overflow-x-auto::-webkit-scrollbar {
-        height: 8px;
-      }
-      .overflow-x-auto::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .overflow-x-auto::-webkit-scrollbar-thumb {
-        background: #4b5563;
-        border-radius: 4px;
-      }
-      .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-        background: #6b7280;
-      }
-      .highlight {
-        animation: highlight-fade 2.5s ease-out;
-      }
+      body { font-family: "Inter", sans-serif; }
+      .material-icons-outlined { font-size: 20px; }
+      .modal-content { animation: slideUp 0.3s ease-out forwards; }
+      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .overflow-x-auto::-webkit-scrollbar { height: 8px; }
+      .overflow-x-auto::-webkit-scrollbar-track { background: transparent; }
+      .overflow-x-auto::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+      .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+      .highlight { animation: highlight-fade 2.5s ease-out; }
       @keyframes highlight-fade {
-        0%,
-        10% {
-          background: #fef08a;
-          color: #1f2937;
-        }
-        100% {
-          background: #374151;
-          color: #e5e7eb;
-        }
+        0%,10% { background:#fef08a; color:#1f2937; }
+        100% { background:#374151; color:#e5e7eb; }
       }
-      #csvGrid table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-      #csvGrid th,
-      #csvGrid td {
-        border: 1px solid #4b5563;
-        padding: 8px;
-        text-align: left;
-      }
-      #csvGrid th {
-        background: #374151;
-      }
-      #csvGrid td:focus {
-        outline: 2px solid #2563eb;
-        background: #1e293b;
-      }
-      .toggle-checkbox:checked {
-        background: #2563eb;
-      }
-      .toggle-checkbox:checked::before {
-        transform: translateX(100%);
-        border-color: #2563eb;
-      }
-      .calendar-day {
-        min-height: 120px;
-      }
+      #csvGrid table { border-collapse: collapse; width: 100%; }
+      #csvGrid th, #csvGrid td { border: 1px solid #4b5563; padding: 8px; text-align: left; }
+      #csvGrid th { background: #374151; }
+      #csvGrid td:focus { outline: 2px solid #2563eb; background: #1e293b; }
+      .toggle-checkbox:checked { background: #2563eb; }
+      .toggle-checkbox:checked::before { transform: translateX(100%); border-color: #2563eb; }
+      .calendar-day { min-height: 120px; }
     </style>
   </head>
 
   <body class="bg-gray-900 text-gray-200 antialiased">
     <!-- =========== LOGIN VIEW =========== -->
-    <div
-      id="loginView"
-      class="min-h-screen flex items-center justify-center bg-gray-900 p-4"
-    >
+    <div id="loginView" class="min-h-screen flex items-center justify-center bg-gray-900 p-4">
       <div class="w-full max-w-md">
         <div class="text-center mb-8">
           <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
           <p class="text-gray-400 mt-2">The future of project collaboration.</p>
         </div>
-        <div
-          class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8"
-        >
+        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
           <form id="loginForm">
             <div class="mb-4">
-              <label
-                for="email"
-                class="block text-gray-400 text-sm font-bold mb-2"
-                >Email Address</label
-              >
-              <input
-                type="email"
-                id="email"
-                class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                required
-              />
+              <label for="email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+              <input type="email" id="email" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
             </div>
             <div class="mb-6">
-              <label
-                for="password"
-                class="block text-gray-400 text-sm font-bold mb-2"
-                >Password</label
-              >
-              <input
-                type="password"
-                id="password"
-                class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                required
-              />
+              <label for="password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+              <input type="password" id="password" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
             </div>
-            <button
-              type="submit"
-              class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg"
-            >
-              Sign In
-            </button>
+            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Sign In</button>
             <p class="text-center text-gray-500 text-sm mt-6">
               Don't have an account?
-              <a
-                href="#"
-                id="goToRegister"
-                class="text-cyan-400 hover:underline"
-                >Sign Up</a
-              >
+              <a href="#" id="goToRegister" class="text-cyan-400 hover:underline">Sign Up</a>
             </p>
           </form>
         </div>
@@ -160,73 +74,30 @@
     </div>
 
     <!-- =========== REGISTER VIEW =========== -->
-    <div
-      id="registerView"
-      class="min-h-screen hidden items-center justify-center bg-gray-900 p-4"
-    >
+    <div id="registerView" class="min-h-screen hidden items-center justify-center bg-gray-900 p-4">
       <div class="w-full max-w-md">
         <div class="text-center mb-8">
           <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
           <p class="text-gray-400 mt-2">Create your account</p>
         </div>
-        <div
-          class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8"
-        >
+        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
           <form id="registerForm">
             <div class="mb-4">
-              <label
-                for="reg_name"
-                class="block text-gray-400 text-sm font-bold mb-2"
-                >Full Name</label
-              >
-              <input
-                type="text"
-                id="reg_name"
-                placeholder="Jane Doe"
-                class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                required
-              />
+              <label for="reg_name" class="block text-gray-400 text-sm font-bold mb-2">Full Name</label>
+              <input type="text" id="reg_name" placeholder="Jane Doe" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
             </div>
             <div class="mb-4">
-              <label
-                for="reg_email"
-                class="block text-gray-400 text-sm font-bold mb-2"
-                >Email Address</label
-              >
-              <input
-                type="email"
-                id="reg_email"
-                placeholder="you@example.com"
-                class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                required
-              />
+              <label for="reg_email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+              <input type="email" id="reg_email" placeholder="you@example.com" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
             </div>
             <div class="mb-6">
-              <label
-                for="reg_password"
-                class="block text-gray-400 text-sm font-bold mb-2"
-                >Password</label
-              >
-              <input
-                type="password"
-                id="reg_password"
-                placeholder="Minimum 8 characters"
-                minlength="8"
-                class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                required
-              />
+              <label for="reg_password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+              <input type="password" id="reg_password" placeholder="Minimum 8 characters" minlength="8" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
             </div>
-            <button
-              type="submit"
-              class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg"
-            >
-              Create Account
-            </button>
+            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Create Account</button>
             <p class="text-center text-gray-500 text-sm mt-6">
               Already have an account?
-              <a href="#" id="goToLogin" class="text-cyan-400 hover:underline"
-                >Sign In</a
-              >
+              <a href="#" id="goToLogin" class="text-cyan-400 hover:underline">Sign In</a>
             </p>
           </form>
         </div>
@@ -242,78 +113,23 @@
             <h1 class="text-2xl font-bold text-cyan-400">NexusFlow</h1>
           </div>
           <div class="flex-grow p-4 space-y-2 overflow-y-auto">
-            <h3
-              class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider"
-            >
-              Projects
-            </h3>
+            <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
             <ul id="projectNav" class="space-y-1"></ul>
-            <button
-              id="addNewProjectBtn"
-              class="w-full mt-2 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg flex items-center gap-2"
-            >
+            <button id="addNewProjectBtn" class="w-full mt-2 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg flex items-center gap-2">
               <span class="material-icons-outlined">add</span>New Project
             </button>
             <hr class="border-gray-700 my-4" />
-            <h3
-              class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider"
-            >
-              Tools
-            </h3>
+            <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Tools</h3>
             <ul id="mainNav" class="space-y-1">
-              <li>
-                <a
-                  href="#"
-                  data-view="todoView"
-                  class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  ><span class="material-icons-outlined">check_box</span>To-Do
-                  Lists</a
-                >
-              </li>
-              <li>
-                <a
-                  href="#"
-                  data-view="taskTrackingView"
-                  class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  ><span class="material-icons-outlined">grid_on</span>Task
-                  Tracking</a
-                >
-              </li>
-              <li>
-                <a
-                  href="#"
-                  data-view="milestonesView"
-                  class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  ><span class="material-icons-outlined">flag</span
-                  >Milestones</a
-                >
-              </li>
-              <li>
-                <a
-                  href="#"
-                  data-view="communicationView"
-                  id="commNavLink"
-                  class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  ><span class="material-icons-outlined">send</span
-                  >Communication</a
-                >
-              </li>
-              <li>
-                <a
-                  href="#"
-                  data-view="profileView"
-                  class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  ><span class="material-icons-outlined">person</span
-                  >Profiles</a
-                >
-              </li>
+              <li><a href="#" data-view="todoView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">check_box</span>To-Do Lists</a></li>
+              <li><a href="#" data-view="taskTrackingView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">grid_on</span>Task Tracking</a></li>
+              <li><a href="#" data-view="milestonesView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">flag</span>Milestones</a></li>
+              <li><a href="#" data-view="communicationView" id="commNavLink" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">send</span>Communication</a></li>
+              <li><a href="#" data-view="profileView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">person</span>Profiles</a></li>
             </ul>
           </div>
           <div class="p-4 border-t border-gray-700">
-            <button
-              id="logoutBtn"
-              class="w-full flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-800/50 hover:text-red-300"
-            >
+            <button id="logoutBtn" class="w-full flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-800/50 hover:text-red-300">
               <span class="material-icons-outlined">logout</span>Logout
             </button>
           </div>
@@ -321,16 +137,10 @@
 
         <!-- Main -->
         <main class="flex-1 flex flex-col overflow-hidden">
-          <header
-            class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex justify-between items-center flex-shrink-0"
-          >
+          <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex justify-between items-center flex-shrink-0">
             <h2 id="viewTitle" class="text-xl font-semibold"></h2>
             <div class="flex items-center gap-4">
-              <img
-                src="https://placehold.co/40x40/1f2937/9ca3af?text=PM"
-                alt="User Avatar"
-                class="rounded-full"
-              />
+              <img src="https://placehold.co/40x40/1f2937/9ca3af?text=PM" alt="User Avatar" class="rounded-full" />
               <div id="currentUserDisplay"></div>
             </div>
           </header>
@@ -341,43 +151,16 @@
 
     <!-- =========== MODALS (containers only; content is rendered by JS) =========== -->
     <div id="modalsContainer"></div>
-    <div
-      id="colorPickerModal"
-      class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50"
-    >
+    <div id="colorPickerModal" class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50">
       <div class="grid grid-cols-4 gap-1">
-        <div
-          class="w-6 h-6 rounded bg-green-500 cursor-pointer"
-          data-color="bg-green-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-yellow-500 cursor-pointer"
-          data-color="bg-yellow-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-red-500 cursor-pointer"
-          data-color="bg-red-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-blue-500 cursor-pointer"
-          data-color="bg-blue-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-indigo-500 cursor-pointer"
-          data-color="bg-indigo-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-purple-500 cursor-pointer"
-          data-color="bg-purple-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-pink-500 cursor-pointer"
-          data-color="bg-pink-500"
-        ></div>
-        <div
-          class="w-6 h-6 rounded bg-gray-800 border border-gray-600 cursor-pointer"
-          data-color=""
-        ></div>
+        <div class="w-6 h-6 rounded bg-green-500 cursor-pointer" data-color="bg-green-500"></div>
+        <div class="w-6 h-6 rounded bg-yellow-500 cursor-pointer" data-color="bg-yellow-500"></div>
+        <div class="w-6 h-6 rounded bg-red-500 cursor-pointer" data-color="bg-red-500"></div>
+        <div class="w-6 h-6 rounded bg-blue-500 cursor-pointer" data-color="bg-blue-500"></div>
+        <div class="w-6 h-6 rounded bg-indigo-500 cursor-pointer" data-color="bg-indigo-500"></div>
+        <div class="w-6 h-6 rounded bg-purple-500 cursor-pointer" data-color="bg-purple-500"></div>
+        <div class="w-6 h-6 rounded bg-pink-500 cursor-pointer" data-color="bg-pink-500"></div>
+        <div class="w-6 h-6 rounded bg-gray-800 border border-gray-600 cursor-pointer" data-color=""></div>
       </div>
     </div>
 
@@ -409,6 +192,22 @@
     if (!res.ok) throw { status: res.status, data };
     return data;
   }
+
+  // Use this for multipart/form-data uploads (does NOT set Content-Type)
+  async function apiUpload(path, formData) {
+    const token = localStorage.getItem(LS_TOKEN_KEY);
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers,       // browser sets Content-Type boundary automatically
+      body: formData,
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { status: res.status, data };
+    return data;
+  }
+
   function saveAuth({ token, user }) {
     localStorage.setItem(LS_TOKEN_KEY, token);
     localStorage.setItem(LS_USER_KEY, JSON.stringify(user));
@@ -1188,16 +987,8 @@
       return content;
     }
     function createMilestoneHTML(m) {
-      const difficultyColors = {
-        Easy: "text-green-400",
-        Medium: "text-yellow-400",
-        Hard: "text-red-400",
-      };
-      const priorityColors = {
-        Low: "bg-green-500/20",
-        Medium: "bg-yellow-500/20",
-        High: "bg-red-500/20",
-      };
+      const difficultyColors = { Easy: "text-green-400", Medium: "text-yellow-400", Hard: "text-red-400" };
+      const priorityColors = { Low: "bg-green-500/20", Medium: "bg-yellow-500/20", High: "bg-red-500/20" };
       return `<div class="mb-8">
         <div class="absolute -left-3.5 mt-1.5 h-6 w-6 rounded-full bg-cyan-500 border-4 border-gray-800"></div>
         <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
@@ -1280,9 +1071,7 @@
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2"><h4 class="font-semibold">AI Automated Communication</h4><span class="info-btn text-gray-500 cursor-pointer" data-info="aiComm">info</span></div>
                   <label><div class="relative inline-block w-10 mr-2 align-middle select-none">
-                    <input type="checkbox" name="ai_active" id="ai_toggle" class="toggle-checkbox w-12 h-6 transition duration-200 ease-in-out bg-gray-600 rounded-full appearance-none cursor-pointer before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:left-1 before:top-1 before:transition-all" ${
-                      taskData.aiComm.active ? "checked" : ""
-                    }/>
+                    <input type="checkbox" name="ai_active" id="ai_toggle" class="toggle-checkbox w-12 h-6 transition duration-200 ease-in-out bg-gray-600 rounded-full appearance-none cursor-pointer before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:left-1 before:top-1 before:transition-all" ${taskData.aiComm.active ? "checked" : ""}/>
                   </div></label>
                 </div>
                 <div class="${taskData.aiComm.active ? "" : "hidden"}">
@@ -1291,9 +1080,7 @@
                     ${["Mon", "Tue", "Wed", "Thu", "Fri"]
                       .map(
                         (d) =>
-                          `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${
-                            taskData.aiComm.days.includes(d) ? "checked" : ""
-                          }> ${d}</label>`
+                          `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? "checked" : ""}> ${d}</label>`
                       )
                       .join("")}
                   </div>
@@ -1308,9 +1095,7 @@
                 ${state.users
                   .map(
                     (u) =>
-                      `<option value="${u.name}" ${
-                        taskData.assignee === u.name ? "selected" : ""
-                      }>${u.name}</option>`
+                      `<option value="${u.name}" ${taskData.assignee === u.name ? "selected" : ""}>${u.name}</option>`
                   )
                   .join("")}
                 <option value="add_new">-- Add New --</option>
@@ -1351,8 +1136,7 @@
               <select name="priority" class="w-full bg-gray-700 p-2 rounded-lg">
                 ${Object.keys(priorityStyles)
                   .map(
-                    (p) =>
-                      `<option ${data.priority === p ? "selected" : ""}>${p}</option>`
+                    (p) => `<option ${data.priority === p ? "selected" : ""}>${p}</option>`
                   )
                   .join("")}
               </select>
@@ -1363,9 +1147,7 @@
               ${state.users
                 .map(
                   (u) =>
-                    `<option value="${u.name}" ${
-                      data.assignee === u.name ? "selected" : ""
-                    }>${u.name}</option>`
+                    `<option value="${u.name}" ${data.assignee === u.name ? "selected" : ""}>${u.name}</option>`
                 )
                 .join("")}
             </select>
@@ -1408,13 +1190,7 @@
       const milestone = state.activeMilestone;
       const isNew = !milestone;
       const data = isNew
-        ? {
-            title: "",
-            description: "",
-            dueDate: "",
-            priority: "Medium",
-            difficulty: "Medium",
-          }
+        ? { title: "", description: "", dueDate: "", priority: "Medium", difficulty: "Medium" }
         : milestone;
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="milestoneForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
@@ -1424,34 +1200,34 @@
             <textarea name="description" placeholder="Description" class="w-full bg-gray-700 p-2 rounded-lg h-24">${data.description}</textarea>
             <input name="dueDate" type="date" value="${data.dueDate}" class="w-full bg-gray-700 p-2 rounded-lg">
             <div class="grid grid-cols-2 gap-4">
-              <select name="priority" class="w-full bg-gray-700 p-2 rounded-lg"><option>Low</option><option ${
-                data.priority === "Medium" ? "selected" : ""
-              }>Medium</option><option>High</option></select>
-              <select name="difficulty" class="w-full bg-gray-700 p-2 rounded-lg"><option>Easy</option><option ${
-                data.difficulty === "Medium" ? "selected" : ""
-              }>Medium</option><option>Hard</option></select>
+              <select name="priority" class="w-full bg-gray-700 p-2 rounded-lg"><option>Low</option><option ${data.priority === "Medium" ? "selected" : ""}>Medium</option><option>High</option></select>
+              <select name="difficulty" class="w-full bg-gray-700 p-2 rounded-lg"><option>Easy</option><option ${data.difficulty === "Medium" ? "selected" : ""}>Medium</option><option>Hard</option></select>
             </div>
           </div>
           <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save</button></div>
         </form>
       </div>`;
     }
+
+    // UPDATED: field names to match backend & resume file input
     function createProfileModalHTML() {
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
-        <form id="profileForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700">
+        <form id="profileForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700" enctype="multipart/form-data">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">Add New Developer Profile</h2></div>
           <div class="p-6 flex-grow space-y-4 overflow-y-auto max-h-[60vh]">
-            <input name="name" placeholder="Full Name" class="w-full bg-gray-700 p-2 rounded-lg" required>
+            <input name="fullName" placeholder="Full Name" class="w-full bg-gray-700 p-2 rounded-lg" required>
             <input name="title" placeholder="Job Title" class="w-full bg-gray-700 p-2 rounded-lg">
             <textarea name="description" placeholder="Description..." class="w-full bg-gray-700 p-2 rounded-lg h-20"></textarea>
             <input name="email" type="email" placeholder="Email" class="w-full bg-gray-700 p-2 rounded-lg">
             <input name="phone" type="tel" placeholder="Phone" class="w-full bg-gray-700 p-2 rounded-lg">
-            <input name="linkedin" type="url" placeholder="LinkedIn URL" class="w-full bg-gray-700 p-2 rounded-lg">
-            <input name="github" type="url" placeholder="GitHub URL" class="w-full bg-gray-700 p-2 rounded-lg">
+            <input name="linkedinUrl" type="url" placeholder="LinkedIn URL" class="w-full bg-gray-700 p-2 rounded-lg">
+            <input name="githubUrl" type="url" placeholder="GitHub URL" class="w-full bg-gray-700 p-2 rounded-lg">
             <input name="languages" placeholder="Coding Languages (comma-separated)" class="w-full bg-gray-700 p-2 rounded-lg">
             <textarea name="adminFeedback" placeholder="Admin Feedback..." class="w-full bg-gray-700 p-2 rounded-lg h-20"></textarea>
-            <div><label class="block text-sm font-medium text-gray-400 mb-1">Resume</label>
-              <input type="file" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500/10 file:text-cyan-300 hover:file:bg-cyan-500/20">
+            <div>
+              <label class="block text-sm font-medium text-gray-400 mb-1">Resume</label>
+              <input name="resume" type="file" accept=".pdf,.doc,.docx"
+                     class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500/10 file:text-cyan-300 hover:file:bg-cyan-500/20">
             </div>
           </div>
           <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save Profile</button></div>
@@ -1707,13 +1483,12 @@
             title: taskData.content,
             description: taskData.notes || null,
             assigneeId: null, // map to real user id later
-            status: uiToApiStatus["Backlog"], // new tasks go to backlog
+            status: uiToApiStatus["Backlog"],
             priority: uiToApiPriority[taskData.priority || "Medium"],
-            dueDate: taskData.dueDate || null, // supports YYYY-MM-DD in backend schema below
+            dueDate: taskData.dueDate || null,
           };
           await apiFetch("/api/tasks", { method: "POST", body: payload });
 
-          // Re-hydrate tasks so the board reflects server
           await hydrateTasksForProject(project.id);
           state.isTaskModalOpen = false;
         } catch (err) {
@@ -1771,7 +1546,6 @@
             body: { name, description },
           });
 
-          // Add to UI state with default columns
           const newProj = {
             id: created.id,
             name: created.name,
@@ -1784,7 +1558,6 @@
           state.activeProjectId = created.id;
           state.currentView = "dashboardView";
           state.isProjectModalOpen = false;
-          // load its tasks (none yet, but keeps code path consistent)
           await hydrateTasksForProject(created.id);
         } catch (err) {
           const msg =
@@ -1797,21 +1570,51 @@
         }
       }
 
-      // Save Profile
+      // UPDATED: Save Profile (with optional resume upload)
       if (e.target.id === "profileForm") {
         e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        state.users.push({
-          id: Date.now(),
-          languages: (data.languages || "")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          ...data,
-        });
-        state.isProfileModalOpen = false;
-        render();
+
+        const formEl = e.target;
+        const fd = new FormData(formEl);
+
+        // Normalize languages to JSON array string for backend
+        const langs = (fd.get("languages") || "")
+          .toString()
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean);
+        fd.set("languages", JSON.stringify(langs));
+
+        try {
+          const created = await apiUpload("/api/profiles", fd);
+
+          // Update local UI list
+          state.users.push({
+            id: created.id,
+            name: created.full_name,
+            title: created.title || "",
+            description: created.description || "",
+            email: created.email || "",
+            phone: created.phone || "",
+            linkedin: created.linkedin_url || "",
+            github: created.github_url || "",
+            languages: created.languages || [],
+            adminFeedback: created.admin_feedback || "",
+            avatar: "...",
+            resumeUrl: created.resume_url || null,
+          });
+
+          state.isProfileModalOpen = false;
+          render();
+        } catch (err) {
+          const msg =
+            err?.data?.error?.formErrors?.join?.(", ") ||
+            (err?.data?.error?.fieldErrors &&
+              Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+            err?.data?.error ||
+            "Failed to save profile";
+          alert(msg);
+        }
       }
     });
   });
