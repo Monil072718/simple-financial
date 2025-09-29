@@ -1,607 +1,704 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexusFlow - Project Management</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts & Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
-      rel="stylesheet"
-    />
-    <!-- PDF Export Libraries (used elsewhere in app) -->
-    <script src="="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <style>
-      body { font-family: "Inter", sans-serif; }
-      .material-icons-outlined { font-size: 20px; }
-      .modal-content { animation: slideUp 0.3s ease-out forwards; }
-      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      .overflow-x-auto::-webkit-scrollbar { height: 8px; }
-      .overflow-x-auto::-webkit-scrollbar-track { background: transparent; }
-      .overflow-x-auto::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-      .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-      .highlight { animation: highlight-fade 2.5s ease-out; }
-      @keyframes highlight-fade { 0%,10% { background:#fef08a; color:#1f2937; } 100% { background:#374151; color:#e5e7eb; } }
-      #csvGrid table { border-collapse: collapse; width: 100%; }
-      #csvGrid th, #csvGrid td { border: 1px solid #4b5563; padding: 8px; text-align: left; }
-      #csvGrid th { background: #374151; }
-      #csvGrid td:focus { outline: 2px solid #2563eb; background: #1e293b; }
-      .toggle-checkbox:checked { background: #2563eb; }
-      .toggle-checkbox:checked::before { transform: translateX(100%); border-color: #2563eb; }
-      .calendar-day { min-height: 120px; }
-    </style>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusFlow - Project Management</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+  <!-- PDF Export Libraries (used elsewhere in app) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-  <body class="bg-gray-900 text-gray-200 antialiased">
-    <!-- =========== LOGIN VIEW =========== -->
-    <div id="loginView" class="min-h-screen flex items-center justify-center bg-gray-900 p-4">
-      <div class="w-full max-w-md">
-        <div class="text-center mb-8">
-          <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
-          <p class="text-gray-400 mt-2">The future of project collaboration.</p>
-        </div>
-        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
-          <form id="loginForm">
-            <div class="mb-4">
-              <label for="email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
-              <input type="email" id="email" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
-            </div>
-            <div class="mb-6">
-              <label for="password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
-              <input type="password" id="password" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
-            </div>
-            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Sign In</button>
-            <p class="text-center text-gray-500 text-sm mt-6">
-              Don't have an account?
-              <a href="#" id="goToRegister" class="text-cyan-400 hover:underline">Sign Up</a>
-            </p>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- =========== REGISTER VIEW =========== -->
-    <div id="registerView" class="min-h-screen hidden items-center justify-center bg-gray-900 p-4">
-      <div class="w-full max-w-md">
-        <div class="text-center mb-8">
-          <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
-          <p class="text-gray-400 mt-2">Create your account</p>
-        </div>
-        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
-          <form id="registerForm">
-            <div class="mb-4">
-              <label for="reg_name" class="block text-gray-400 text-sm font-bold mb-2">Full Name</label>
-              <input type="text" id="reg_name" placeholder="Jane Doe" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
-            </div>
-            <div class="mb-4">
-              <label for="reg_email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
-              <input type="email" id="reg_email" placeholder="you@example.com" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
-            </div>
-            <div class="mb-6">
-              <label for="reg_password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
-              <input type="password" id="reg_password" placeholder="Minimum 8 characters" minlength="8" class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors" required />
-            </div>
-            <button type="submit" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Create Account</button>
-            <p class="text-center text-gray-500 text-sm mt-6">
-              Already have an account?
-              <a href="#" id="goToLogin" class="text-cyan-400 hover:underline">Sign In</a>
-            </p>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- =========== MAIN APPLICATION VIEW =========== -->
-    <div id="appView" class="hidden">
-      <div class="flex h-screen bg-gray-900">
-        <!-- Sidebar -->
-        <nav class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-          <div class="p-6 text-center border-b border-gray-700">
-            <h1 class="text-2xl font-bold text-cyan-400">NexusFlow</h1>
-          </div>
-          <div class="flex-grow p-4 space-y-2 overflow-y-auto">
-            <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
-            <ul id="projectNav" class="space-y-1"></ul>
-            <button id="addNewProjectBtn" class="w-full mt-2 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg flex items-center gap-2">
-              <span class="material-icons-outlined">add</span>New Project
-            </button>
-            <hr class="border-gray-700 my-4" />
-            <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Tools</h3>
-            <ul id="mainNav" class="space-y-1">
-              <li><a href="#" data-view="todoView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">check_box</span>To-Do Lists</a></li>
-              <li><a href="#" data-view="taskTrackingView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">grid_on</span>Task Tracking</a></li>
-              <li><a href="#" data-view="milestonesView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">flag</span>Milestones</a></li>
-              <li><a href="#" data-view="communicationView" id="commNavLink" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">send</span>Communication</a></li>
-              <li><a href="#" data-view="profileView" class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span class="material-icons-outlined">person</span>Profiles</a></li>
-            </ul>
-          </div>
-          <div class="p-4 border-t border-gray-700">
-            <button id="logoutBtn" class="w-full flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-800/50 hover:text-red-300">
-              <span class="material-icons-outlined">logout</span>Logout
-            </button>
-          </div>
-        </nav>
-
-        <!-- Main -->
-        <main class="flex-1 flex flex-col overflow-hidden">
-          <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex justify-between items-center flex-shrink-0">
-            <h2 id="viewTitle" class="text-xl font-semibold"></h2>
-            <div class="flex items-center gap-4">
-              <img src="https://placehold.co/40x40/1f2937/9ca3af?text=PM" alt="User Avatar" class="rounded-full" />
-              <div id="currentUserDisplay"></div>
-            </div>
-          </header>
-          <div class="flex-1 overflow-y-auto" id="mainContent"></div>
-        </main>
-      </div>
-    </div>
-
-    <!-- =========== MODALS (containers only; content is rendered by JS) =========== -->
-    <div id="modalsContainer"></div>
-
-    <!-- Color picker for grid (unchanged) -->
-    <div id="colorPickerModal" class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50">
-      <div class="grid grid-cols-4 gap-1">
-        <div class="w-6 h-6 rounded bg-green-500 cursor-pointer" data-color="bg-green-500"></div>
-        <div class="w-6 h-6 rounded bg-yellow-500 cursor-pointer" data-color="bg-yellow-500"></div>
-        <div class="w-6 h-6 rounded bg-red-500 cursor-pointer" data-color="bg-red-500"></div>
-        <div class="w-6 h-6 rounded bg-blue-500 cursor-pointer" data-color="bg-blue-500"></div>
-        <div class="w-6 h-6 rounded bg-indigo-500 cursor-pointer" data-color="bg-indigo-500"></div>
-        <div class="w-6 h-6 rounded bg-purple-500 cursor-pointer" data-color="bg-purple-500"></div>
-        <div class="w-6 h-6 rounded bg-pink-500 cursor-pointer" data-color="bg-pink-500"></div>
-        <div class="w-6 h-6 rounded bg-gray-800 border border-gray-600 cursor-pointer" data-color=""></div>
-      </div>
-    </div>
-
-    <script>
-  // jsPDF usage in other views
-  const { jsPDF } = window.jspdf || {};
-
-  // ====================== API HELPERS (Same-origin) ======================
-  const API_BASE = ""; // same origin (http://localhost:3000)
-  const LS_TOKEN_KEY = "nf_token";
-  const LS_USER_KEY = "nf_user";
-
-  async function apiFetch(path, { method = "GET", body, headers = {} } = {}) {
-    const token = localStorage.getItem(LS_TOKEN_KEY);
-    const res = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "same-origin",
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw { status: res.status, data };
-    return data;
-  }
-
-  // Use this for multipart/form-data uploads (does NOT set Content-Type)
-  async function apiUpload(path, formData) {
-    const token = localStorage.getItem(LS_TOKEN_KEY);
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers, // browser sets boundary automatically
-      body: formData,
-      credentials: "same-origin",
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw { status: res.status, data };
-    return data;
-  }
-
-  function saveAuth({ token, user }) {
-    localStorage.setItem(LS_TOKEN_KEY, token);
-    localStorage.setItem(LS_USER_KEY, JSON.stringify(user));
-  }
-  function loadAuth() {
-    const token = localStorage.getItem(LS_TOKEN_KEY);
-    const user = JSON.parse(localStorage.getItem(LS_USER_KEY) || "null");
-    return token && user ? { token, user } : null;
-  }
-  function clearAuth() {
-    localStorage.removeItem(LS_TOKEN_KEY);
-    localStorage.removeItem(LS_USER_KEY);
-  }
-
-  // ==== Task & Priority mappers (UI <-> API) ====
-  const UI_COLS = ["Backlog","Pending","Assigned","In Progress","Waiting to Review","Finished"];
-  const uiToApiStatus = {
-    Backlog: "todo",
-    Pending: "pending",
-    Assigned: "assigned",
-    "In Progress": "in_progress",
-    "Waiting to Review": "review",
-    Finished: "done",
-  };
-  const apiToUiStatus = Object.fromEntries(Object.entries(uiToApiStatus).map(([k,v]) => [v,k]));
-  const uiToApiPriority = { Low:"low", Medium:"medium", High:"high", Urgent:"urgent" };
-  const apiToUiPriority = { low:"Low", medium:"Medium", high:"High", urgent:"Urgent" };
-  function columnTitleToIndex(title) { return UI_COLS.indexOf(title); }
-
-  // ====================== APP ======================
-  document.addEventListener("DOMContentLoaded", () => {
-    // DOM
-    const loginView = document.getElementById("loginView");
-    const registerView = document.getElementById("registerView");
-    const appView = document.getElementById("appView");
-    const modalsContainer = document.getElementById("modalsContainer");
-    const viewTitle = document.getElementById("viewTitle");
-    const goToRegister = document.getElementById("goToRegister");
-    const goToLogin = document.getElementById("goToLogin");
-
-    // Simple view routing
-    function showLogin() {
-      loginView.classList.remove("hidden"); loginView.classList.add("flex");
-      registerView.classList.add("hidden"); registerView.classList.remove("flex");
-      appView.classList.add("hidden"); history.replaceState(null, "", "#/login");
-    }
-    function showRegister() {
-      loginView.classList.add("hidden"); loginView.classList.remove("flex");
-      registerView.classList.remove("hidden"); registerView.classList.add("flex");
-      appView.classList.add("hidden"); history.replaceState(null, "", "#/register");
-    }
-    function showApp() {
-      loginView.classList.add("hidden"); registerView.classList.add("hidden");
-      appView.classList.remove("hidden"); history.replaceState(null, "", "#/app");
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
     }
 
-    if (location.hash === "#/register") showRegister(); else showLogin();
-    if (goToRegister) goToRegister.addEventListener("click", (e) => { e.preventDefault(); showRegister(); });
-    if (goToLogin) goToLogin.addEventListener("click", (e) => { e.preventDefault(); showLogin(); });
+    .material-icons-outlined {
+      font-size: 20px;
+    }
 
-    // ---------- State ----------
-    let state = {
-      currentUser: null,
-      currentView: "dashboardView",
-      dashboardMode: "board",
-      profileViewMode: "grid",
-      calendarDate: new Date(),
-      activeProjectId: null,
-      activeTodoListId: 1,
-      activeMilestoneProjectId: null,
-      activeTask: null,
-      activeTodoItem: null,
-      activeProfile: null,
+    .modal-content {
+      animation: slideUp 0.3s ease-out forwards;
+    }
 
-      isTaskModalOpen: false,
-      isTodoModalOpen: false,
-      isInfoModalOpen: false,
-      isMoveToProjectModalOpen: false,
-      isMilestoneModalOpen: false,
-      isProfileModalOpen: false,
-      isAiModalOpen: false,
-      isProjectModalOpen: false,
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
 
-      infoModalContent: { title: "", body: "" },
-      activeMilestone: null,
-      itemToMove: null,
-      selectedTasksForAI: new Set(),
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
 
-      gridData: [
-        ["Task Name","Assignee","Mon","Tue","Wed","Thu","Fri","Status"],
-        [
-          { text: "API Endpoint Design", color: "" },
-          { text: "John S.", color: "" },
-          { text: "", color: "bg-green-500" },
-          { text: "", color: "bg-green-500" },
-          { text: "", color: "bg-yellow-500" },
-          { text: "", color: "" },
-          { text: "", color: "" },
-          { text: "In Progress", color: "" },
-        ],
-        [
-          { text: "Frontend UI Mockup", color: "" },
-          { text: "Jane D.", color: "" },
-          { text: "", color: "" },
-          { text: "", color: "" },
-          { text: "", color: "" },
-          { text: "", color: "" },
-          { text: "", color: "" },
-          { text: "Pending", color: "" },
-        ],
-      ],
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 8px;
+    }
 
-      projects: [],
-      todoLists: [
-        {
-          id: 1,
-          name: "General Ideas",
-          items: [
-            {
-              id: 201,
-              content: "Integrate a real-time chat feature",
-              description: "Use WebSockets for instant communication.",
-              links: "https://socket.io",
-              priority: "High",
-              dueDate: "",
-              assignee: null,
-              thingsToConsider: "Scalability for many users.",
-              subtasks: [
-                { text: "Research libraries", done: true },
-                { text: "Create UI mockups", done: false },
-              ],
-              createdAt: Date.now(),
-            },
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 4px;
+    }
+
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+
+    .highlight {
+      animation: highlight-fade 2.5s ease-out;
+    }
+
+    @keyframes highlight-fade {
+
+      0%,
+      10% {
+        background: #fef08a;
+        color: #1f2937;
+      }
+
+      100% {
+        background: #374151;
+        color: #e5e7eb;
+      }
+    }
+
+    #csvGrid table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    #csvGrid th,
+    #csvGrid td {
+      border: 1px solid #4b5563;
+      padding: 8px;
+      text-align: left;
+    }
+
+    #csvGrid th {
+      background: #374151;
+    }
+
+    #csvGrid td:focus {
+      outline: 2px solid #2563eb;
+      background: #1e293b;
+    }
+
+    .toggle-checkbox:checked {
+      background: #2563eb;
+    }
+
+    .toggle-checkbox:checked::before {
+      transform: translateX(100%);
+      border-color: #2563eb;
+    }
+
+    .calendar-day {
+      min-height: 120px;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-gray-200 antialiased">
+  <!-- =========== LOGIN VIEW =========== -->
+  <div id="loginView" class="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
+        <p class="text-gray-400 mt-2">The future of project collaboration.</p>
+      </div>
+      <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
+        <form id="loginForm">
+          <div class="mb-4">
+            <label for="email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+            <input type="email" id="email"
+              class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              required />
+          </div>
+          <div class="mb-6">
+            <label for="password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+            <input type="password" id="password"
+              class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              required />
+          </div>
+          <button type="submit"
+            class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Sign
+            In</button>
+          <p class="text-center text-gray-500 text-sm mt-6">
+            Don't have an account?
+            <a href="#" id="goToRegister" class="text-cyan-400 hover:underline">Sign Up</a>
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========== REGISTER VIEW =========== -->
+  <div id="registerView" class="min-h-screen hidden items-center justify-center bg-gray-900 p-4">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-cyan-400">NexusFlow</h1>
+        <p class="text-gray-400 mt-2">Create your account</p>
+      </div>
+      <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-8">
+        <form id="registerForm">
+          <div class="mb-4">
+            <label for="reg_name" class="block text-gray-400 text-sm font-bold mb-2">Full Name</label>
+            <input type="text" id="reg_name" placeholder="Jane Doe"
+              class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              required />
+          </div>
+          <div class="mb-4">
+            <label for="reg_email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
+            <input type="email" id="reg_email" placeholder="you@example.com"
+              class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              required />
+          </div>
+          <div class="mb-6">
+            <label for="reg_password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+            <input type="password" id="reg_password" placeholder="Minimum 8 characters" minlength="8"
+              class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              required />
+          </div>
+          <button type="submit"
+            class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 shadow-lg">Create
+            Account</button>
+          <p class="text-center text-gray-500 text-sm mt-6">
+            Already have an account?
+            <a href="#" id="goToLogin" class="text-cyan-400 hover:underline">Sign In</a>
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========== MAIN APPLICATION VIEW =========== -->
+  <div id="appView" class="hidden">
+    <div class="flex h-screen bg-gray-900">
+      <!-- Sidebar -->
+      <nav class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div class="p-6 text-center border-b border-gray-700">
+          <h1 class="text-2xl font-bold text-cyan-400">NexusFlow</h1>
+        </div>
+        <div class="flex-grow p-4 space-y-2 overflow-y-auto">
+          <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Projects</h3>
+          <ul id="projectNav" class="space-y-1"></ul>
+          <button id="addNewProjectBtn"
+            class="w-full mt-2 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg flex items-center gap-2">
+            <span class="material-icons-outlined">add</span>New Project
+          </button>
+          <hr class="border-gray-700 my-4" />
+          <h3 class="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Tools</h3>
+          <ul id="mainNav" class="space-y-1">
+            <li><a href="#" data-view="todoView"
+                class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span
+                  class="material-icons-outlined">check_box</span>To-Do Lists</a></li>
+            <li><a href="#" data-view="taskTrackingView"
+                class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span
+                  class="material-icons-outlined">grid_on</span>Task Tracking</a></li>
+            <li><a href="#" data-view="milestonesView"
+                class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span
+                  class="material-icons-outlined">flag</span>Milestones</a></li>
+            <li><a href="#" data-view="communicationView" id="commNavLink"
+                class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span
+                  class="material-icons-outlined">send</span>Communication</a></li>
+            <li><a href="#" data-view="profileView"
+                class="nav-link flex items-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-gray-200"><span
+                  class="material-icons-outlined">person</span>Profiles</a></li>
+          </ul>
+        </div>
+        <div class="p-4 border-t border-gray-700">
+          <button id="logoutBtn"
+            class="w-full flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-800/50 hover:text-red-300">
+            <span class="material-icons-outlined">logout</span>Logout
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main -->
+      <main class="flex-1 flex flex-col overflow-hidden">
+        <header
+          class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex justify-between items-center flex-shrink-0">
+          <h2 id="viewTitle" class="text-xl font-semibold"></h2>
+          <div class="flex items-center gap-4">
+            <img src="https://placehold.co/40x40/1f2937/9ca3af?text=PM" alt="User Avatar" class="rounded-full" />
+            <div id="currentUserDisplay"></div>
+          </div>
+        </header>
+        <div class="flex-1 overflow-y-auto" id="mainContent"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- =========== MODALS (containers only; content is rendered by JS) =========== -->
+  <div id="modalsContainer"></div>
+
+  <!-- Color picker for grid (unchanged) -->
+  <div id="colorPickerModal" class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50">
+    <div class="grid grid-cols-4 gap-1">
+      <div class="w-6 h-6 rounded bg-green-500 cursor-pointer" data-color="bg-green-500"></div>
+      <div class="w-6 h-6 rounded bg-yellow-500 cursor-pointer" data-color="bg-yellow-500"></div>
+      <div class="w-6 h-6 rounded bg-red-500 cursor-pointer" data-color="bg-red-500"></div>
+      <div class="w-6 h-6 rounded bg-blue-500 cursor-pointer" data-color="bg-blue-500"></div>
+      <div class="w-6 h-6 rounded bg-indigo-500 cursor-pointer" data-color="bg-indigo-500"></div>
+      <div class="w-6 h-6 rounded bg-purple-500 cursor-pointer" data-color="bg-purple-500"></div>
+      <div class="w-6 h-6 rounded bg-pink-500 cursor-pointer" data-color="bg-pink-500"></div>
+      <div class="w-6 h-6 rounded bg-gray-800 border border-gray-600 cursor-pointer" data-color=""></div>
+    </div>
+  </div>
+
+  <script>
+    // jsPDF usage in other views
+    const { jsPDF } = window.jspdf || {};
+
+    // ====================== API HELPERS (Same-origin) ======================
+    const API_BASE = ""; // same origin (http://localhost:3000)
+    const LS_TOKEN_KEY = "nf_token";
+    const LS_USER_KEY = "nf_user";
+
+    async function apiFetch(path, { method = "GET", body, headers = {} } = {}) {
+      const token = localStorage.getItem(LS_TOKEN_KEY);
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: "same-origin",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
+
+    // Use this for multipart/form-data uploads (does NOT set Content-Type)
+    async function apiUpload(path, formData) {
+      const token = localStorage.getItem(LS_TOKEN_KEY);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers, // browser sets boundary automatically
+        body: formData,
+        credentials: "same-origin",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
+
+    function saveAuth({ token, user }) {
+      localStorage.setItem(LS_TOKEN_KEY, token);
+      localStorage.setItem(LS_USER_KEY, JSON.stringify(user));
+    }
+    function loadAuth() {
+      const token = localStorage.getItem(LS_TOKEN_KEY);
+      const user = JSON.parse(localStorage.getItem(LS_USER_KEY) || "null");
+      return token && user ? { token, user } : null;
+    }
+    function clearAuth() {
+      localStorage.removeItem(LS_TOKEN_KEY);
+      localStorage.removeItem(LS_USER_KEY);
+    }
+
+    // ==== Task & Priority mappers (UI <-> API) ====
+    const UI_COLS = ["Backlog", "Pending", "Assigned", "In Progress", "Waiting to Review", "Finished"];
+    const uiToApiStatus = {
+      Backlog: "todo",
+      Pending: "pending",
+      Assigned: "assigned",
+      "In Progress": "in_progress",
+      "Waiting to Review": "review",
+      Finished: "done",
+    };
+    const apiToUiStatus = Object.fromEntries(Object.entries(uiToApiStatus).map(([k, v]) => [v, k]));
+    const uiToApiPriority = { Low: "low", Medium: "medium", High: "high", Urgent: "urgent" };
+    const apiToUiPriority = { low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };
+    function columnTitleToIndex(title) { return UI_COLS.indexOf(title); }
+
+    // ====================== APP ======================
+    document.addEventListener("DOMContentLoaded", () => {
+      // DOM
+      const loginView = document.getElementById("loginView");
+      const registerView = document.getElementById("registerView");
+      const appView = document.getElementById("appView");
+      const modalsContainer = document.getElementById("modalsContainer");
+      const viewTitle = document.getElementById("viewTitle");
+      const goToRegister = document.getElementById("goToRegister");
+      const goToLogin = document.getElementById("goToLogin");
+
+      // Simple view routing
+      function showLogin() {
+        loginView.classList.remove("hidden"); loginView.classList.add("flex");
+        registerView.classList.add("hidden"); registerView.classList.remove("flex");
+        appView.classList.add("hidden"); history.replaceState(null, "", "#/login");
+      }
+      function showRegister() {
+        loginView.classList.add("hidden"); loginView.classList.remove("flex");
+        registerView.classList.remove("hidden"); registerView.classList.add("flex");
+        appView.classList.add("hidden"); history.replaceState(null, "", "#/register");
+      }
+      function showApp() {
+        loginView.classList.add("hidden"); registerView.classList.add("hidden");
+        appView.classList.remove("hidden"); history.replaceState(null, "", "#/app");
+      }
+
+      if (location.hash === "#/register") showRegister(); else showLogin();
+      if (goToRegister) goToRegister.addEventListener("click", (e) => { e.preventDefault(); showRegister(); });
+      if (goToLogin) goToLogin.addEventListener("click", (e) => { e.preventDefault(); showLogin(); });
+
+      // ---------- State ----------
+      let state = {
+        currentUser: null,
+        currentView: "dashboardView",
+        dashboardMode: "board",
+        profileViewMode: "grid",
+        calendarDate: new Date(),
+        activeProjectId: null,
+        activeTodoListId: 1,
+        activeMilestoneProjectId: null,
+        activeTask: null,
+        activeTodoItem: null,
+        activeProfile: null,
+
+        isTaskModalOpen: false,
+        isTodoModalOpen: false,
+        isInfoModalOpen: false,
+        isMoveToProjectModalOpen: false,
+        isMilestoneModalOpen: false,
+        isProfileModalOpen: false,
+        isAiModalOpen: false,
+        isProjectModalOpen: false,
+
+        infoModalContent: { title: "", body: "" },
+        activeMilestone: null,
+        itemToMove: null,
+        selectedTasksForAI: new Set(),
+
+        gridData: [
+          ["Task Name", "Assignee", "Mon", "Tue", "Wed", "Thu", "Fri", "Status"],
+          [
+            { text: "API Endpoint Design", color: "" },
+            { text: "John S.", color: "" },
+            { text: "", color: "bg-green-500" },
+            { text: "", color: "bg-green-500" },
+            { text: "", color: "bg-yellow-500" },
+            { text: "", color: "" },
+            { text: "", color: "" },
+            { text: "In Progress", color: "" },
           ],
-        },
-      ],
-      // This will be overwritten by hydrateProfiles()
-      users: [
-        {
-          id: 1,
-          name: "John Smith",
-          title: "Backend Engineer",
-          description: "Specializes in Node.js and database architecture.",
-          email: "john.s@example.com",
-          phone: "123-456-7890",
-          linkedin: "https://linkedin.com/in/johnsmith",
-          github: "https://github.com/johnsmith",
-          languages: ["JavaScript", "SQL", "Python"],
-          adminFeedback: "Consistently delivers high-quality, scalable code.",
-          avatar: "...",
-          resumeUrl: null,
-        },
-      ],
-      communicationLogs: [
-        {
-          id: 1,
-          timestamp: "2025-09-15 10:30 AM",
-          recipient: "John Smith",
-          summary: "Update on task #103",
-          message: "Hey John, just wanted to check on the progress for the API authentication endpoint. Let me know if you need any help.",
-        },
-      ],
-    };
+          [
+            { text: "Frontend UI Mockup", color: "" },
+            { text: "Jane D.", color: "" },
+            { text: "", color: "" },
+            { text: "", color: "" },
+            { text: "", color: "" },
+            { text: "", color: "" },
+            { text: "", color: "" },
+            { text: "Pending", color: "" },
+          ],
+        ],
 
-    const priorityStyles = {
-      Low: "bg-green-500/20 text-green-300",
-      Medium: "bg-yellow-500/20 text-yellow-300",
-      High: "bg-red-500/20 text-red-300",
-      Urgent: "bg-red-500/20 text-red-300",
-    };
+        projects: [],
+        todoLists: [
+          {
+            id: 1,
+            name: "General Ideas",
+            items: [
+              {
+                id: 201,
+                content: "Integrate a real-time chat feature",
+                description: "Use WebSockets for instant communication.",
+                links: "https://socket.io",
+                priority: "High",
+                dueDate: "",
+                assignee: null,
+                thingsToConsider: "Scalability for many users.",
+                subtasks: [
+                  { text: "Research libraries", done: true },
+                  { text: "Create UI mockups", done: false },
+                ],
+                createdAt: Date.now(),
+              },
+            ],
+          },
+        ],
+        // This will be overwritten by hydrateProfiles()
+        users: [
+          {
+            id: 1,
+            name: "John Smith",
+            title: "Backend Engineer",
+            description: "Specializes in Node.js and database architecture.",
+            email: "john.s@example.com",
+            phone: "123-456-7890",
+            linkedin: "https://linkedin.com/in/johnsmith",
+            github: "https://github.com/johnsmith",
+            languages: ["JavaScript", "SQL", "Python"],
+            adminFeedback: "Consistently delivers high-quality, scalable code.",
+            avatar: "...",
+            resumeUrl: null,
+          },
+        ],
+        communicationLogs: [
+          {
+            id: 1,
+            timestamp: "2025-09-15 10:30 AM",
+            recipient: "John Smith",
+            summary: "Update on task #103",
+            message: "Hey John, just wanted to check on the progress for the API authentication endpoint. Let me know if you need any help.",
+          },
+        ],
+      };
 
-    const defaultColumns = () => [
-      { id: Date.now(), title: "Backlog", tasks: [] },
-      { id: Date.now() + 1, title: "Pending", tasks: [] },
-      { id: Date.now() + 2, title: "Assigned", tasks: [] },
-      { id: Date.now() + 3, title: "In Progress", tasks: [] },
-      { id: Date.now() + 4, title: "Waiting to Review", tasks: [] },
-      { id: Date.now() + 5, title: "Finished", tasks: [] },
-    ];
+      const priorityStyles = {
+        Low: "bg-green-500/20 text-green-300",
+        Medium: "bg-yellow-500/20 text-yellow-300",
+        High: "bg-red-500/20 text-red-300",
+        Urgent: "bg-red-500/20 text-red-300",
+      };
 
-    function findTaskById(taskId) {
-      for (const p of state.projects) {
-        for (const c of p.columns) {
-          const t = c.tasks.find((t) => t.id === taskId);
-          if (t) return t;
+      const defaultColumns = () => [
+        { id: Date.now(), title: "Backlog", tasks: [] },
+        { id: Date.now() + 1, title: "Pending", tasks: [] },
+        { id: Date.now() + 2, title: "Assigned", tasks: [] },
+        { id: Date.now() + 3, title: "In Progress", tasks: [] },
+        { id: Date.now() + 4, title: "Waiting to Review", tasks: [] },
+        { id: Date.now() + 5, title: "Finished", tasks: [] },
+      ];
+
+      function findTaskById(taskId) {
+        for (const p of state.projects) {
+          for (const c of p.columns) {
+            const t = c.tasks.find((t) => t.id === taskId);
+            if (t) return t;
+          }
+        }
+        return null;
+      }
+
+      // ===== Hydrate Projects from API, then their Tasks =====
+      async function hydrateProjects() {
+        try {
+          const projects = await apiFetch("/api/projects");
+          state.projects = (projects || []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            description: row.description ?? "",
+            columns: defaultColumns(),
+            milestones: [],
+            _tasksLoaded: false,
+          }));
+          if (state.projects.length && !state.activeProjectId) {
+            state.activeProjectId = state.projects[0].id;
+          }
+        } catch (err) {
+          console.warn("Failed to load projects, showing local sample:", err);
+          if (!state.projects.length) {
+            state.projects = [
+              { id: 1, name: "Sample Project", columns: defaultColumns(), milestones: [], _tasksLoaded: true },
+            ];
+            state.activeProjectId = 1;
+          }
+        }
+        if (state.activeProjectId) await hydrateTasksForProject(state.activeProjectId);
+        else render();
+      }
+
+      // ===== Hydrate Profiles from API =====
+      async function hydrateProfiles() {
+        try {
+          const rows = await apiFetch("/api/profiles?q=&page=1&limit=100");
+          state.users = rows.map((r) => ({
+            id: r.id,
+            name: r.full_name,
+            title: r.title || "",
+            description: r.description || "",
+            email: r.email || "",
+            phone: r.phone || "",
+            linkedin: r.linkedin_url || "",
+            github: r.github_url || "",
+            languages: Array.isArray(r.languages) ? r.languages : [],
+            adminFeedback: r.admin_feedback || "",
+            avatar: "...",
+            resumeUrl: r.resume_url || null,
+          }));
+          if (state.currentView === "profileView") render();
+        } catch (err) {
+          console.warn("Failed to load profiles:", err);
         }
       }
-      return null;
-    }
 
-    // ===== Hydrate Projects from API, then their Tasks =====
-    async function hydrateProjects() {
-      try {
-        const projects = await apiFetch("/api/projects");
-        state.projects = (projects || []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          description: row.description ?? "",
-          columns: defaultColumns(),
-          milestones: [],
-          _tasksLoaded: false,
-        }));
-        if (state.projects.length && !state.activeProjectId) {
-          state.activeProjectId = state.projects[0].id;
+      // ===== Hydrate Tasks for one Project =====
+      async function hydrateTasksForProject(projectId) {
+        const project = state.projects.find((p) => p.id === projectId);
+        if (!project) return;
+
+        project.columns.forEach((c) => (c.tasks = []));
+        try {
+          const tasks = await apiFetch(`/api/tasks?projectId=${projectId}&limit=200`);
+          (tasks || []).forEach((t) => {
+            const uiTask = {
+              id: t.id,
+              content: t.title,
+              notes: t.description || "",
+              assignee: null,
+              links: "",
+              dueDate: t.due_date || t.dueDate || "",
+              priority: apiToUiPriority[t.priority] || "Medium",
+              aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
+              subtasks: [],
+            };
+            const colTitle = apiToUiStatus[t.status] || "Backlog";
+            const colIdx = columnTitleToIndex(colTitle);
+            if (colIdx >= 0) project.columns[colIdx].tasks.push(uiTask);
+            else project.columns[0].tasks.push(uiTask);
+          });
+          project._tasksLoaded = true;
+          render();
+        } catch (e) {
+          console.warn("Failed to load tasks:", e);
         }
-      } catch (err) {
-        console.warn("Failed to load projects, showing local sample:", err);
-        if (!state.projects.length) {
-          state.projects = [
-            { id: 1, name: "Sample Project", columns: defaultColumns(), milestones: [], _tasksLoaded: true },
-          ];
-          state.activeProjectId = 1;
+      }
+
+      // ---------- AUTH: LOGIN (API) ----------
+      const loginForm = document.getElementById("loginForm");
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const password = document.getElementById("password").value;
+        try {
+          const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
+          saveAuth({ token, user });
+          state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
+          document.getElementById("currentUserDisplay").innerHTML =
+            `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+          document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+          showApp();
+          await hydrateProjects();
+          await hydrateProfiles();
+        } catch (err) {
+          alert(err?.data?.error || "Invalid email or password.");
         }
-      }
-      if (state.activeProjectId) await hydrateTasksForProject(state.activeProjectId);
-      else render();
-    }
+      });
 
-    // ===== Hydrate Profiles from API =====
-    async function hydrateProfiles() {
-      try {
-        const rows = await apiFetch("/api/profiles?q=&page=1&limit=100");
-        state.users = rows.map((r) => ({
-          id: r.id,
-          name: r.full_name,
-          title: r.title || "",
-          description: r.description || "",
-          email: r.email || "",
-          phone: r.phone || "",
-          linkedin: r.linkedin_url || "",
-          github: r.github_url || "",
-          languages: Array.isArray(r.languages) ? r.languages : [],
-          adminFeedback: r.admin_feedback || "",
-          avatar: "...",
-          resumeUrl: r.resume_url || null,
-        }));
-        if (state.currentView === "profileView") render();
-      } catch (err) {
-        console.warn("Failed to load profiles:", err);
-      }
-    }
+      // ---------- AUTH: REGISTER (API) ----------
+      const registerForm = document.getElementById("registerForm");
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("reg_name").value.trim();
+        const email = document.getElementById("reg_email").value.trim().toLowerCase();
+        const password = document.getElementById("reg_password").value;
+        try {
+          await apiFetch("/api/users", { method: "POST", body: { name, email, password } });
+          const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
+          saveAuth({ token, user });
+          state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
+          document.getElementById("currentUserDisplay").innerHTML =
+            `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+          document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+          showApp();
+          await hydrateProjects();
+          await hydrateProfiles();
+        } catch (err) {
+          const msg =
+            err?.data?.error?.formErrors?.join?.(", ") ||
+            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+            err?.data?.error ||
+            "Registration failed";
+          alert(msg);
+        }
+      });
 
-    // ===== Hydrate Tasks for one Project =====
-    async function hydrateTasksForProject(projectId) {
-      const project = state.projects.find((p) => p.id === projectId);
-      if (!project) return;
-
-      project.columns.forEach((c) => (c.tasks = []));
-      try {
-        const tasks = await apiFetch(`/api/tasks?projectId=${projectId}&limit=200`);
-        (tasks || []).forEach((t) => {
-          const uiTask = {
-            id: t.id,
-            content: t.title,
-            notes: t.description || "",
-            assignee: null,
-            links: "",
-            dueDate: t.due_date || t.dueDate || "",
-            priority: apiToUiPriority[t.priority] || "Medium",
-            aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
-            subtasks: [],
-          };
-          const colTitle = apiToUiStatus[t.status] || "Backlog";
-          const colIdx = columnTitleToIndex(colTitle);
-          if (colIdx >= 0) project.columns[colIdx].tasks.push(uiTask);
-          else project.columns[0].tasks.push(uiTask);
-        });
-        project._tasksLoaded = true;
-        render();
-      } catch (e) {
-        console.warn("Failed to load tasks:", e);
-      }
-    }
-
-    // ---------- AUTH: LOGIN (API) ----------
-    const loginForm = document.getElementById("loginForm");
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value.trim().toLowerCase();
-      const password = document.getElementById("password").value;
-      try {
-        const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
-        saveAuth({ token, user });
-        state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
+      // ---------- Restore session ----------
+      const saved = loadAuth();
+      if (saved?.user) {
+        state.currentUser = { email: saved.user.email, name: saved.user.name, role: saved.user.role || "member" };
         document.getElementById("currentUserDisplay").innerHTML =
           `<p class="font-semibold text-sm">${state.currentUser.name}</p>
-           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
-        showApp();
-        await hydrateProjects();
-        await hydrateProfiles();
-      } catch (err) {
-        alert(err?.data?.error || "Invalid email or password.");
-      }
-    });
-
-    // ---------- AUTH: REGISTER (API) ----------
-    const registerForm = document.getElementById("registerForm");
-    registerForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = document.getElementById("reg_name").value.trim();
-      const email = document.getElementById("reg_email").value.trim().toLowerCase();
-      const password = document.getElementById("reg_password").value;
-      try {
-        await apiFetch("/api/users", { method: "POST", body: { name, email, password } });
-        const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
-        saveAuth({ token, user });
-        state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
-        document.getElementById("currentUserDisplay").innerHTML =
-          `<p class="font-semibold text-sm">${state.currentUser.name}</p>
-           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
-        showApp();
-        await hydrateProjects();
-        await hydrateProfiles();
-      } catch (err) {
-        const msg =
-          err?.data?.error?.formErrors?.join?.(", ") ||
-          (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
-          err?.data?.error ||
-          "Registration failed";
-        alert(msg);
-      }
-    });
-
-    // ---------- Restore session ----------
-    const saved = loadAuth();
-    if (saved?.user) {
-      state.currentUser = { email: saved.user.email, name: saved.user.name, role: saved.user.role || "member" };
-      document.getElementById("currentUserDisplay").innerHTML =
-        `<p class="font-semibold text-sm">${state.currentUser.name}</p>
          <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-      document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
-      showApp();
-      hydrateProjects();
-      hydrateProfiles();
-    }
+        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+        showApp();
+        hydrateProjects();
+        hydrateProfiles();
+      }
 
-    // ---------- Logout ----------
-    const logoutBtn = document.getElementById("logoutBtn");
-    logoutBtn.addEventListener("click", () => {
-      clearAuth();
-      state.currentUser = null;
-      showLogin();
-    });
+      // ---------- Logout ----------
+      const logoutBtn = document.getElementById("logoutBtn");
+      logoutBtn.addEventListener("click", () => {
+        clearAuth();
+        state.currentUser = null;
+        showLogin();
+      });
 
-    // ---------- Renderers ----------
-    function render() {
-      if (!state.currentUser) return;
-      renderProjectsNav();
-      renderMainNavLinkStates();
-      renderMainContent();
-      renderModals();
-    }
-    function renderProjectsNav() {
-      const nav = document.getElementById("projectNav");
-      nav.innerHTML = state.projects.map((p) => `
+      // ---------- Renderers ----------
+      function render() {
+        if (!state.currentUser) return;
+        renderProjectsNav();
+        renderMainNavLinkStates();
+        renderMainContent();
+        renderModals();
+      }
+      function renderProjectsNav() {
+        const nav = document.getElementById("projectNav");
+        nav.innerHTML = state.projects.map((p) => `
         <li>
           <a href="#" data-project-id="${p.id}"
              class="project-link flex justify-between items-center px-4 py-2 rounded-lg ${p.id === state.activeProjectId && state.currentView === "dashboardView" ? "bg-gray-700 text-gray-200" : "text-gray-400 hover:bg-gray-700/50"}">
             <span>${p.name}</span>
           </a>
         </li>`).join("");
-    }
-    function renderMainNavLinkStates() {
-      document.querySelectorAll("#mainNav .nav-link").forEach((l) => {
-        l.classList.toggle("bg-gray-700", l.dataset.view === state.currentView);
-        l.classList.toggle("text-gray-200", l.dataset.view === state.currentView);
-      });
-    }
-    function renderMainContent() {
-      let content = "";
-      switch (state.currentView) {
-        case "dashboardView": {
-          const p = state.projects.find((p) => p.id === state.activeProjectId);
-          if (p) { viewTitle.textContent = `${p.name} Dashboard`; content = renderDashboard(p); }
-          else { viewTitle.textContent = "Dashboard"; content = `<div class="p-6 text-gray-400">No project selected.</div>`; }
-          break;
+      }
+      function renderMainNavLinkStates() {
+        document.querySelectorAll("#mainNav .nav-link").forEach((l) => {
+          l.classList.toggle("bg-gray-700", l.dataset.view === state.currentView);
+          l.classList.toggle("text-gray-200", l.dataset.view === state.currentView);
+        });
+      }
+      function renderMainContent() {
+        let content = "";
+        switch (state.currentView) {
+          case "dashboardView": {
+            const p = state.projects.find((p) => p.id === state.activeProjectId);
+            if (p) { viewTitle.textContent = `${p.name} Dashboard`; content = renderDashboard(p); }
+            else { viewTitle.textContent = "Dashboard"; content = `<div class="p-6 text-gray-400">No project selected.</div>`; }
+            break;
+          }
+          case "todoView": viewTitle.textContent = "To-Do Lists"; content = renderTodoView(); break;
+          case "taskTrackingView": viewTitle.textContent = "Task Tracking Matrix"; content = renderTaskTrackingView(); break;
+          case "communicationView": viewTitle.textContent = "Communication"; content = renderCommunicationView(); break;
+          case "profileView": viewTitle.textContent = "Developer Profiles"; content = renderProfileView(); break;
+          case "milestonesView": viewTitle.textContent = "Milestones"; content = renderMilestonesView(); break;
         }
-        case "todoView": viewTitle.textContent = "To-Do Lists"; content = renderTaskTrackingView(); break;
-        case "taskTrackingView": viewTitle.textContent = "Task Tracking Matrix"; content = renderTaskTrackingView(); break;
-        case "communicationView": viewTitle.textContent = "Communication"; content = renderCommunicationView(); break;
-        case "profileView": viewTitle.textContent = "Developer Profiles"; content = renderProfileView(); break;
-        case "milestonesView": viewTitle.textContent = "Milestones"; content = renderMilestonesView(); break;
-      }
-      document.getElementById("mainContent").innerHTML = content;
+        document.getElementById("mainContent").innerHTML = content;
 
-      if (state.currentView === "dashboardView") {
-        const project = state.projects.find((p) => p.id === state.activeProjectId);
-        if (!project) return;
-        if (state.dashboardMode === "table") renderTableView(project);
-        if (state.dashboardMode === "calendar") renderCalendarView(project);
+        if (state.currentView === "dashboardView") {
+          const project = state.projects.find((p) => p.id === state.activeProjectId);
+          if (!project) return;
+          if (state.dashboardMode === "table") renderTableView(project);
+          if (state.dashboardMode === "calendar") renderCalendarView(project);
+        }
+        if (state.currentView === "taskTrackingView") renderCsvAsGrid(state.gridData);
       }
-      if (state.currentView === "taskTrackingView") renderCsvAsGrid(state.gridData);
-    }
 
-    function renderDashboard(project) {
-      return `<div class="p-6 h-full flex flex-col">
+      function renderDashboard(project) {
+        return `<div class="p-6 h-full flex flex-col">
         <div class="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div class="flex items-center gap-4">
             <button id="addTaskBtn" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all shadow-md hover:bg-cyan-600"><span class="material-icons-outlined">add</span>Add Task</button>
@@ -621,17 +718,17 @@
           <div id="kanbanCalendarView" class="h-full ${state.dashboardMode === "calendar" ? "" : "hidden"}"></div>
         </div>
       </div>`;
-    }
-    function createColumnHTML(col) {
-      const tasks = col.tasks || [];
-      return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full" data-column-id="${col.id}">
+      }
+      function createColumnHTML(col) {
+        const tasks = col.tasks || [];
+        return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full" data-column-id="${col.id}">
         <h3 class="font-bold text-lg text-cyan-300 mb-4">${col.title} (${tasks.length})</h3>
         <div class="tasks-container flex-grow space-y-4">${tasks.map((t) => createTaskCardHTML(t)).join("")}</div>
       </div>`;
-    }
-    function createTaskCardHTML(task) {
-      const assignee = state.users.find((u) => u.name === task.assignee);
-      return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative">
+      }
+      function createTaskCardHTML(task) {
+        const assignee = state.users.find((u) => u.name === task.assignee);
+        return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative">
         <input type="checkbox" class="task-checkbox absolute top-2 right-2 h-5 w-5 bg-gray-600 border-gray-500 rounded text-indigo-500" data-task-id="${task.id}">
         <div class="cursor-pointer task-content" data-task-id="${task.id}">
           <p class="font-medium pr-8">${task.content}</p>
@@ -641,81 +738,84 @@
           </div>
         </div>
       </div>`;
-    }
-    function renderTableView(project) {
-      const container = document.getElementById("kanbanTableView");
-      if (!container) return;
-      let table = `<table class="w-full text-sm text-left"><thead class="text-xs text-gray-400 uppercase bg-gray-700/50"><tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Status</th><th class="px-6 py-3">Priority</th><th class="px-6 py-3">Assignee</th><th class="px-6 py-3">Due Date</th></tr></thead><tbody>`;
-      project.columns.forEach((col) => {
-        col.tasks.forEach((task) => {
-          const assignee = state.users.find((u) => u.name === task.assignee);
-          table += `<tr class="border-b border-gray-700">
+      }
+      function renderTableView(project) {
+        const container = document.getElementById("kanbanTableView");
+        if (!container) return;
+        let table = `<table class="w-full text-sm text-left"><thead class="text-xs text-gray-400 uppercase bg-gray-700/50"><tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Status</th><th class="px-6 py-3">Priority</th><th class="px-6 py-3">Assignee</th><th class="px-6 py-3">Due Date</th></tr></thead><tbody>`;
+        project.columns.forEach((col) => {
+          col.tasks.forEach((task) => {
+            const assignee = state.users.find((u) => u.name === task.assignee);
+            table += `<tr class="border-b border-gray-700">
             <td class="px-6 py-4 font-medium">${task.content}</td>
             <td class="px-6 py-4">${col.title}</td>
             <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority] || "bg-gray-600 text-gray-300"}">${task.priority || "Medium"}</span></td>
             <td class="px-6 py-4">${assignee ? assignee.name : "Unassigned"}</td>
             <td class="px-6 py-4">${task.dueDate || "N/A"}</td>
           </tr>`;
+          });
         });
-      });
-      table += `</tbody></table>`;
-      container.innerHTML = table;
-    }
-    function renderCalendarView(project) {
-      const container = document.getElementById("kanbanCalendarView");
-      if (!container) return;
-      const tasks = project.columns.flatMap((c) => c.tasks);
-      const date = state.calendarDate, year = date.getFullYear(), month = date.getMonth();
-      const firstDay = new Date(year, month, 1).getDay();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const monthName = date.toLocaleString("default", { month: "long" });
+        table += `</tbody></table>`;
+        container.innerHTML = table;
+      }
+      function renderCalendarView(project) {
+        const container = document.getElementById("kanbanCalendarView");
+        if (!container) return;
+        const tasks = project.columns.flatMap((c) => c.tasks);
+        const date = state.calendarDate, year = date.getFullYear(), month = date.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const monthName = date.toLocaleString("default", { month: "long" });
 
-      let html = `<div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-full flex flex-col">
+        let html = `<div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-full flex flex-col">
         <div class="flex justify-between items-center mb-4">
           <button id="prevMonthBtn">&lt;</button>
           <h3 class="text-xl font-bold">${monthName} ${year}</h3>
           <button id="nextMonthBtn">&gt;</button>
         </div>
         <div class="grid grid-cols-7 gap-px bg-gray-700 flex-grow">
-          ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="text-center font-semibold text-xs py-2 bg-gray-800">${d}</div>`).join("")}`;
-      for (let i = 0; i < firstDay; i++) html += `<div class="bg-gray-800/50"></div>`;
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dayTasks = tasks.filter((t) =>
-          t.dueDate &&
-          new Date(t.dueDate).getFullYear() === year &&
-          new Date(t.dueDate).getMonth() === month &&
-          new Date(t.dueDate).getDate() === day
-        );
-        html += `<div class="bg-gray-800 p-2 calendar-day overflow-y-auto">
+          ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="text-center font-semibold text-xs py-2 bg-gray-800">${d}</div>`).join("")}`;
+        for (let i = 0; i < firstDay; i++) html += `<div class="bg-gray-800/50"></div>`;
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dayTasks = tasks.filter((t) =>
+            t.dueDate &&
+            new Date(t.dueDate).getFullYear() === year &&
+            new Date(t.dueDate).getMonth() === month &&
+            new Date(t.dueDate).getDate() === day
+          );
+          html += `<div class="bg-gray-800 p-2 calendar-day overflow-y-auto">
           <div class="font-semibold text-right text-sm">${day}</div>
           <div class="space-y-1 mt-1">
             ${dayTasks.map((t) => `<div class="text-xs bg-cyan-600 p-1 rounded cursor-pointer task-content" data-task-id="${t.id}">${t.content}</div>`).join("")}
           </div>
         </div>`;
+        }
+        html += `</div></div>`;
+        container.innerHTML = html;
       }
-      html += `</div></div>`;
-      container.innerHTML = html;
-    }
-    function renderCsvAsGrid(data) {
-      const container = document.getElementById("csvGrid");
-      if (!container) return;
-      if (!data || !data.length) {
-        container.innerHTML = `<p class="text-gray-500 text-center">Upload a CSV file to begin tracking tasks.</p>`;
-        return;
+
+      // FIXED: Added missing renderTodoView function
+      function renderTodoView() {
+        const activeList = state.todoLists.find(l => l.id === state.activeTodoListId);
+        return `<div class="p-6">
+          <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold">To-Do Lists</h2></div>
+          <div class="flex gap-6">
+            <div class="w-1/4">
+              <h3 class="font-semibold mb-4">My Lists</h3>
+              <ul id="todoListsContainer" class="space-y-2">${state.todoLists.map(l => `<a href="#" data-list-id="${l.id}" class="block p-2 rounded-lg ${l.id === state.activeTodoListId ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-gray-700'}">${l.name}</a>`).join('')}</ul>
+              <button id="addNewListBtn" class="w-full mt-4 text-sm text-gray-400 hover:bg-gray-700 p-2 rounded-lg">+ New List</button>
+            </div>
+            <div class="w-3/4"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${activeList.name}</h3><button id="addNewTodoItemBtn" class="bg-cyan-500 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-2"><span class="material-icons-outlined">add</span>Add Item to List</button></div><div class="space-y-3">${activeList.items.map(item => `
+            <div class="bg-gray-800 p-3 rounded-lg cursor-pointer hover:bg-gray-700/50" data-item-id="${item.id}">
+              <div class="flex justify-between items-center"><p>${item.content}</p><button data-item-id="${item.id}" class="move-to-project-btn text-xs bg-cyan-600 hover:bg-cyan-700 p-1 rounded">Move to Project</button></div>
+              ${item.subtasks && item.subtasks.length > 0 ? `<div class="mt-2 flex flex-wrap gap-1">${item.subtasks.map(st => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${st.text}</span>`).join('')}</div>` : ''}
+            </div>`).join('')}</div></div>
+          </div>
+        </div>`;
       }
-      let table = '<table id="csvGridTable" class="w-full">';
-      table += "<thead><tr>" + data[0].map((h) => `<th>${h}</th>`).join("") + "</tr></thead>";
-      table += "<tbody>";
-      data.slice(1).forEach((row, ri) => {
-        table += "<tr>" + row.map((cell, ci) =>
-          `<td contenteditable="true" class="${cell.color || ""}" data-row="${ri + 1}" data-col="${ci}">${cell.text}</td>`
-        ).join("") + "</tr>";
-      });
-      table += "</tbody></table>";
-      container.innerHTML = table;
-    }
-    function renderTaskTrackingView() {
-      return `<div class="p-6">
+
+      function renderTaskTrackingView() {
+        return `<div class="p-6">
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2"><h2 class="text-2xl font-bold">Task Tracking Matrix</h2><span class="info-btn text-gray-500 cursor-pointer" data-info="taskTracking">info</span></div>
           <div class="flex gap-2">
@@ -726,14 +826,89 @@
         </div>
         <div id="csvGrid" class="bg-gray-800 p-4 rounded-xl border border-gray-700 overflow-auto"></div>
       </div>`;
-    }
+      }
 
-    // ---------- Profile View (uses state.users hydrated from backend) ----------
-    function renderProfileView() {
-      let content = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold">Developer Profiles</h2><button id="addNewProfileBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>Add New Profile</button></div>`;
-      if (state.activeProfile) {
-        const p = state.activeProfile;
-        content = `<button id="backToProfilesBtn" class="text-gray-400 hover:text-white mb-4">&larr; Back to List</button>
+      function renderCsvAsGrid(data) {
+        const container = document.getElementById("csvGrid");
+        if (!container) return;
+        if (!data || !data.length) {
+          container.innerHTML = `<p class="text-gray-500 text-center">Upload a CSV file to begin tracking tasks.</p>`;
+          return;
+        }
+        let table = '<table id="csvGridTable" class="w-full">';
+        table += "<thead><tr>" + data[0].map((h) => `<th>${h}</th>`).join("") + "</tr></thead>";
+        table += "<tbody>";
+        data.slice(1).forEach((row, ri) => {
+          table += "<tr>" + row.map((cell, ci) =>
+            `<td contenteditable="true" class="${cell.color || ""}" data-row="${ri + 1}" data-col="${ci}">${cell.text}</td>`
+          ).join("") + "</tr>";
+        });
+        table += "</tbody></table>";
+        container.innerHTML = table;
+      }
+
+      // FIXED: Added missing renderCommunicationView function
+      function renderCommunicationView() {
+        if (state.currentUser.role !== "admin") {
+          return `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
+        }
+        const activeComms = state.projects.flatMap(p => p.columns.flatMap(c => c.tasks)).filter(t => t.aiComm && t.aiComm.active);
+        return `<div class="p-6">
+          <h2 class="text-2xl font-bold mb-6">Active AI Communications</h2>
+          <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8">
+            <table class="w-full text-sm text-left">
+              <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
+                <tr>
+                  <th class="px-6 py-3">Task</th>
+                  <th class="px-6 py-3">Developer</th>
+                  <th class="px-6 py-3">Frequency</th>
+                  <th class="px-6 py-3">Days</th>
+                  <th class="px-6 py-3">Next Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${activeComms.map(task => `
+                  <tr class="border-b border-gray-700">
+                    <td class="px-6 py-4">${task.content}</td>
+                    <td class="px-6 py-4">${task.assignee || 'Unassigned'}</td>
+                    <td class="px-6 py-4">${task.aiComm.frequency}</td>
+                    <td class="px-6 py-4">${(task.aiComm.days || []).join(', ')}</td>
+                    <td class="px-6 py-4">Tomorrow 9:00 AM</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+          <h2 class="text-2xl font-bold mb-6">Recent Message Logs</h2>
+          <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto">
+            <table class="w-full text-sm text-left">
+              <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
+                <tr>
+                  <th class="px-6 py-3">Timestamp</th>
+                  <th class="px-6 py-3">Recipient</th>
+                  <th class="px-6 py-3">Summary</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${state.communicationLogs.map(log => `
+                  <tr class="border-b border-gray-700">
+                    <td class="px-6 py-4">${log.timestamp}</td>
+                    <td class="px-6 py-4">${log.recipient}</td>
+                    <td class="px-6 py-4">${log.summary}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="3" class="text-center p-4 text-gray-500">No messages logged yet.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }
+
+      // ---------- Profile View (uses state.users hydrated from backend) ----------
+      function renderProfileView() {
+        let content = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold">Developer Profiles</h2><button id="addNewProfileBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>Add New Profile</button></div>`;
+        if (state.activeProfile) {
+          const p = state.activeProfile;
+          content = `<button id="backToProfilesBtn" class="text-gray-400 hover:text-white mb-4">&larr; Back to List</button>
           <div class="bg-gray-800 p-8 rounded-xl border border-gray-700">
             <h2 class="text-2xl font-bold">${p.name}</h2><p class="text-cyan-400">${p.title}</p>
             <div class="mt-4"><strong class="text-gray-400">Description:</strong><p>${p.description || "-"}</p></div>
@@ -749,17 +924,17 @@
             <div class="mt-4"><strong class="text-gray-400">Admin Feedback:</strong><p class="bg-gray-900/50 p-2 rounded-lg">${p.adminFeedback || "-"}</p></div>
             <div class="mt-4">
               ${p.resumeUrl
-                ? `<button class="text-sm bg-gray-700 p-2 rounded-lg view-resume-btn" data-resume="${p.resumeUrl}">View Resume</button>`
-                : `<span class="text-sm text-gray-500">No resume uploaded</span>`}
+              ? `<button class="text-sm bg-gray-700 p-2 rounded-lg view-resume-btn" data-resume="${p.resumeUrl}">View Resume</button>`
+              : `<span class="text-sm text-gray-500">No resume uploaded</span>`}
             </div>
           </div>`;
-      } else {
-        content += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${state.users.map((u) => createProfileCardHTML(u)).join("")}</div>`;
+        } else {
+          content += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${state.users.map((u) => createProfileCardHTML(u)).join("")}</div>`;
+        }
+        return `<div class="p-6 max-w-5xl mx-auto">${content}</div>`;
       }
-      return `<div class="p-6 max-w-5xl mx-auto">${content}</div>`;
-    }
-    function createProfileCardHTML(user) {
-      return `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+      function createProfileCardHTML(user) {
+        return `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
         <h3 class="font-bold text-lg">${user.name}</h3>
         <p class="text-sm text-cyan-400">${user.title || ""}</p>
         <div class="mt-2 flex flex-wrap gap-1">${(user.languages || []).slice(0, 3).map((l) => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${l}</span>`).join("")}</div>
@@ -768,47 +943,12 @@
           <button data-user-id="${user.id}" class="view-profile-btn text-sm text-cyan-400 hover:underline">View Details</button>
         </div>
       </div>`;
-    }
-
-    function renderCommunicationView() {
-      if (state.currentUser.role !== "admin") {
-        return `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
       }
-      const activeComms = state.projects.flatMap((p) => p.columns.flatMap((c) => c.tasks)).filter((t) => t.aiComm && t.aiComm.active);
-      return `<div class="p-6">
-        <h2 class="text-2xl font-bold mb-6">Active AI Communications</h2>
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8">
-          <table class="w-full text-sm text-left">
-            <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
-              <tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Developer</th><th class="px-6 py-3">Frequency</th><th class="px-6 py-3">Days</th><th class="px-6 py-3">Next Message</th></tr>
-            </thead>
-            <tbody>
-              ${activeComms.map((task) => `<tr class="border-b border-gray-700">
-                <td class="px-6 py-4">${task.content}</td>
-                <td class="px-6 py-4">${task.assignee || "Unassigned"}</td>
-                <td class="px-6 py-4">${task.aiComm.frequency}</td>
-                <td class="px-6 py-4">${(task.aiComm.days || []).join(", ")}</td>
-                <td class="px-6 py-4">Tomorrow 9:00 AM</td>
-              </tr>`).join("") || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-        <h2 class="text-2xl font-bold mb-6">Recent Message Logs</h2>
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto">
-          <table class="w-full text-sm text-left">
-            <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
-              <tr><th class="px-6 py-3">Timestamp</th><th class="px-6 py-3">Recipient</th><th class="px-6 py-3">Summary</th></tr>
-            </thead>
-            <tbody>${state.communicationLogs.map((log) => `<tr class="border-b border-gray-700"><td class="px-6 py-4">${log.timestamp}</td><td class="px-6 py-4">${log.recipient}</td><td class="px-6 py-4">${log.summary}</td></tr>`).join("") || '<tr><td colspan="3" class="text-center p-4 text-gray-500">No messages logged yet.</td></tr>'}</tbody>
-          </table>
-        </div>
-      </div>`;
-    }
 
-    function renderMilestonesView() {
-      let content = "";
-      if (state.activeMilestoneProjectId === null) {
-        content = `<div class="p-6">
+      function renderMilestonesView() {
+        let content = "";
+        if (state.activeMilestoneProjectId === null) {
+          content = `<div class="p-6">
           <h2 class="text-2xl font-bold mb-4">Select a project to view its milestones</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             ${state.projects.map((p) => `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700 cursor-pointer hover:border-cyan-500 milestone-project-card" data-project-id="${p.id}">
@@ -817,9 +957,9 @@
               </div>`).join("")}
           </div>
         </div>`;
-      } else {
-        const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
-        content = `<div class="p-6 max-w-4xl mx-auto">
+        } else {
+          const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
+          content = `<div class="p-6 max-w-4xl mx-auto">
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-4">
               <button id="backToProjectsBtn" class="text-gray-400 hover:text-white">&larr;</button>
@@ -834,13 +974,13 @@
             ${project.milestones.map((m) => createMilestoneHTML(m)).join("") || '<p class="text-gray-500">No milestones for this project yet.</p>'}
           </div>
         </div>`;
+        }
+        return content;
       }
-      return content;
-    }
-    function createMilestoneHTML(m) {
-      const difficultyColors = { Easy: "text-green-400", Medium: "text-yellow-400", Hard: "text-red-400" };
-      const priorityColors = { Low: "bg-green-500/20", Medium: "bg-yellow-500/20", High: "bg-red-500/20" };
-      return `<div class="mb-8">
+      function createMilestoneHTML(m) {
+        const difficultyColors = { Easy: "text-green-400", Medium: "text-yellow-400", Hard: "text-red-400" };
+        const priorityColors = { Low: "bg-green-500/20", Medium: "bg-yellow-500/20", High: "bg-red-500/20" };
+        return `<div class="mb-8">
         <div class="absolute -left-3.5 mt-1.5 h-6 w-6 rounded-full bg-cyan-500 border-4 border-gray-800"></div>
         <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
           <div class="flex justify-between items-start">
@@ -856,23 +996,23 @@
           <p class="mt-2 text-gray-300">${m.description}</p>
         </div>
       </div>`;
-    }
+      }
 
-    // ---------- Modal factory functions ----------
-    function renderModals() {
-      modalsContainer.innerHTML = "";
-      if (state.isTaskModalOpen) modalsContainer.innerHTML += createTaskModalHTML();
-      if (state.isTodoModalOpen) modalsContainer.innerHTML += createTodoModalHTML();
-      if (state.isMoveToProjectModalOpen) modalsContainer.innerHTML += createMoveToProjectModalHTML();
-      if (state.isInfoModalOpen) modalsContainer.innerHTML += createInfoModalHTML();
-      if (state.isMilestoneModalOpen) modalsContainer.innerHTML += createMilestoneModalHTML();
-      if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
-      if (state.isAiModalOpen) modalsContainer.innerHTML += createAiModalHTML();
-      if (state.isProjectModalOpen) modalsContainer.innerHTML += createProjectModalHTML();
-    }
+      // ---------- Modal factory functions ----------
+      function renderModals() {
+        modalsContainer.innerHTML = "";
+        if (state.isTaskModalOpen) modalsContainer.innerHTML += createTaskModalHTML();
+        if (state.isTodoModalOpen) modalsContainer.innerHTML += createTodoModalHTML();
+        if (state.isMoveToProjectModalOpen) modalsContainer.innerHTML += createMoveToProjectModalHTML();
+        if (state.isInfoModalOpen) modalsContainer.innerHTML += createInfoModalHTML();
+        if (state.isMilestoneModalOpen) modalsContainer.innerHTML += createMilestoneModalHTML();
+        if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
+        if (state.isAiModalOpen) modalsContainer.innerHTML += createAiModalHTML();
+        if (state.isProjectModalOpen) modalsContainer.innerHTML += createProjectModalHTML();
+      }
 
-    function createProjectModalHTML() {
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      function createProjectModalHTML() {
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <form id="projectForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">Create Project</h2></div>
           <div class="p-6 space-y-4">
@@ -885,16 +1025,16 @@
           </div>
         </form>
       </div>`;
-    }
+      }
 
-    function createTaskModalHTML() {
-      const task = state.activeTask;
-      const isNew = !task;
-      const taskData = isNew ? {
-        content: "", notes: "", priority: "Medium", dueDate: "", assignee: null, subtasks: [],
-        links: "", aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
-      } : task;
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+      function createTaskModalHTML() {
+        const task = state.activeTask;
+        const isNew = !task;
+        const taskData = isNew ? {
+          content: "", notes: "", priority: "Medium", dueDate: "", assignee: null, subtasks: [],
+          links: "", aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
+        } : task;
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="taskForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Create Task" : "Edit Task"}</h2></div>
           <div class="p-6 flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -913,8 +1053,8 @@
                   <select class="w-full bg-gray-700 p-2 rounded-lg mb-2" name="ai_frequency"><option>daily</option><option>weekly</option></select>
                   <div class="flex gap-2 mb-2">
                     ${["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) =>
-                      `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? "checked" : ""}> ${d}</label>`
-                    ).join("")}
+          `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? "checked" : ""}> ${d}</label>`
+        ).join("")}
                   </div>
                   <textarea name="ai_prompt" class="w-full bg-gray-700 p-2 rounded-lg h-20" placeholder="What should the AI ask? e.g., 'Any blockers? What's your estimated completion?'">${taskData.aiComm.prompt}</textarea>
                 </div>
@@ -935,15 +1075,15 @@
           </div>
         </form>
       </div>`;
-    }
+      }
 
-    function createTodoModalHTML() {
-      const item = state.activeTodoItem;
-      const isNew = !item;
-      const data = isNew ? {
-        content: "", description: "", links: "", priority: "Medium", dueDate: "", assignee: null, thingsToConsider: "", subtasks: [],
-      } : item;
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+      function createTodoModalHTML() {
+        const item = state.activeTodoItem;
+        const isNew = !item;
+        const data = isNew ? {
+          content: "", description: "", links: "", priority: "Medium", dueDate: "", assignee: null, thingsToConsider: "", subtasks: [],
+        } : item;
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="todoForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Add" : "Edit"} To-Do Item</h2></div>
           <div class="p-6 flex-grow space-y-4 overflow-y-auto max-h-[60vh]">
@@ -968,10 +1108,10 @@
           </div>
         </form>
       </div>`;
-    }
+      }
 
-    function createMoveToProjectModalHTML() {
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      function createMoveToProjectModalHTML() {
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
           <div class="p-6">
             <h3 class="font-semibold mb-4">Move to which project's backlog?</h3>
@@ -985,10 +1125,10 @@
           </div>
         </div>
       </div>`;
-    }
+      }
 
-    function createInfoModalHTML() {
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      function createInfoModalHTML() {
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
           <div class="p-6 border-b border-gray-700 flex justify-between items-center">
             <h2 class="text-xl font-bold">${state.infoModalContent.title}</h2>
@@ -997,13 +1137,13 @@
           <div class="p-6 text-gray-300 space-y-2">${state.infoModalContent.body}</div>
         </div>
       </div>`;
-    }
+      }
 
-    function createMilestoneModalHTML() {
-      const milestone = state.activeMilestone;
-      const isNew = !milestone;
-      const data = isNew ? { title: "", description: "", dueDate: "", priority: "Medium", difficulty: "Medium" } : milestone;
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+      function createMilestoneModalHTML() {
+        const milestone = state.activeMilestone;
+        const isNew = !milestone;
+        const data = isNew ? { title: "", description: "", dueDate: "", priority: "Medium", difficulty: "Medium" } : milestone;
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="milestoneForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Create" : "Edit"} Milestone</h2></div>
           <div class="p-6 flex-grow space-y-4">
@@ -1018,11 +1158,11 @@
           <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save</button></div>
         </form>
       </div>`;
-    }
+      }
 
-    // UPDATED: field names to match backend & resume file input
-    function createProfileModalHTML() {
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
+      // UPDATED: field names to match backend & resume file input
+      function createProfileModalHTML() {
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="profileForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700" enctype="multipart/form-data">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">Add New Developer Profile</h2></div>
           <div class="p-6 flex-grow space-y-4 overflow-y-auto max-h-[60vh]">
@@ -1044,23 +1184,23 @@
           <div class="p-6 border-t border-gray-700 flex justify-end gap-4"><button type="button" class="close-modal-btn">Cancel</button><button type="submit">Save Profile</button></div>
         </form>
       </div>`;
-    }
+      }
 
-    function createAiModalHTML() {
-      let content = "";
-      state.selectedTasksForAI.forEach((taskId) => {
-        const task = findTaskById(taskId);
-        if (task) {
-          content += `<div class="bg-gray-700 p-4 rounded-lg">
+      function createAiModalHTML() {
+        let content = "";
+        state.selectedTasksForAI.forEach((taskId) => {
+          const task = findTaskById(taskId);
+          if (task) {
+            content += `<div class="bg-gray-700 p-4 rounded-lg">
             <h4 class="font-bold text-lg">${task.content}</h4>
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="bg-gray-800 p-3 rounded-lg border-2 border-green-500"><p class="font-semibold">Top Recommendation: John Smith</p><p class="text-sm text-gray-400 mt-1">Reason: John's skills in Node.js and PostgreSQL are a perfect match for this backend task.</p></div>
               <div class="bg-gray-800 p-3 rounded-lg border border-gray-600"><p class="font-semibold">Second Choice: Alex Ray</p><p class="text-sm text-gray-400 mt-1">Reason: Alex has full-stack experience and can handle the task if John is unavailable.</p></div>
             </div>
           </div>`;
-        }
-      });
-      return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          }
+        });
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-700">
           <div class="p-6 border-b border-gray-700 flex justify-between items-center"><h2 class="text-2xl font-bold">AI Assignment Suggestions</h2><button class="close-modal-btn text-gray-400 hover:text-white">&times;</button></div>
           <div class="p-6 max-h-[60vh] overflow-y-auto space-y-4">${content}</div>
@@ -1070,257 +1210,257 @@
           </div>
         </div>
       </div>`;
-    }
-
-    // ---------- Events ----------
-    document.body.addEventListener("click", async (e) => {
-      const target = e.target;
-      const navLink = target.closest(".nav-link");
-      const projectLink = target.closest(".project-link");
-
-      if (navLink) {
-        state.currentView = navLink.dataset.view;
-        if (navLink.dataset.view === "milestonesView") state.activeMilestoneProjectId = null;
-        render();
       }
 
-      if (projectLink) {
-        state.activeProjectId = parseInt(projectLink.dataset.projectId);
-        state.currentView = "dashboardView";
-        const p = state.projects.find((x) => x.id === state.activeProjectId);
-        if (p && !p._tasksLoaded) await hydrateTasksForProject(p.id); else render();
-      }
+      // ---------- Events ----------
+      document.body.addEventListener("click", async (e) => {
+        const target = e.target;
+        const navLink = target.closest(".nav-link");
+        const projectLink = target.closest(".project-link");
 
-      // Lists & Items
-      if (target.id === "addNewListBtn") {
-        const name = prompt("New list name:");
-        if (name) state.todoLists.push({ id: Date.now(), name, items: [] });
-        render();
-      }
-
-      // Open Create Project modal
-      if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
-
-      if (target.id === "addNewTodoItemBtn") { state.isTodoModalOpen = true; state.activeTodoItem = null; render(); }
-      if (target.id === "addTaskBtn") { state.isTaskModalOpen = true; state.activeTask = null; render(); }
-      if (target.closest(".move-to-project-btn")) {
-        state.itemToMove = parseInt(target.closest("[data-item-id]").dataset.itemId);
-        state.isMoveToProjectModalOpen = true; render();
-      }
-      if (target.id === "confirmMoveBtn") {
-        const targetProjectId = parseInt(document.getElementById("projectSelectDropdown").value);
-        const project = state.projects.find((p) => p.id === targetProjectId);
-        const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
-        const itemIndex = activeList.items.findIndex((i) => i.id === state.itemToMove);
-        if (project && itemIndex > -1) {
-          const [item] = activeList.items.splice(itemIndex, 1);
-          project.columns[0].tasks.push({ id: Date.now(), content: item.content, notes: item.description, ...item });
-        }
-        state.isMoveToProjectModalOpen = false; render();
-      }
-
-      if (target.closest(".close-modal-btn")) {
-        state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
-        state.isInfoModalOpen = false; state.isMilestoneModalOpen = false; state.isProfileModalOpen = false;
-        state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
-      }
-
-      if (target.id === "aiAnalyzeBtn") { state.isAiModalOpen = true; render(); }
-
-      const taskContent = target.closest(".task-content");
-      if (taskContent) {
-        const taskId = parseInt(taskContent.dataset.taskId);
-        const project = state.projects.find((p) => p.id === state.activeProjectId);
-        for (const col of project.columns) {
-          const task = col.tasks.find((t) => t.id === taskId);
-          if (task) { state.activeTask = task; state.isTaskModalOpen = true; render(); break; }
-        }
-      }
-
-      const infoBtn = target.closest(".info-btn");
-      if (infoBtn) {
-        const key = infoBtn.dataset.info;
-        if (key === "milestones") state.infoModalContent = { title: "Milestone Planning Tips", body: "<p>Good milestones are S.M.A.R.T: Specific, Measurable, Achievable, Relevant, and Time-bound. They represent major achievements in your project, not small tasks.</p>" };
-        if (key === "taskTracking") state.infoModalContent = { title: "Task Tracking Matrix", body: "<p>Upload a CSV to see it as a grid. You can write in any cell to update it, or right-click a cell to set a color-coded status.</p>" };
-        if (key === "aiComm") state.infoModalContent = { title: "AI Automated Communication", body: "<p>When activated, the AI will automatically message the assigned developer based on your schedule to ask for updates using your custom prompt.</p>" };
-        state.isInfoModalOpen = true; render();
-      }
-
-      const viewProfileBtn = target.closest(".view-profile-btn");
-      if (viewProfileBtn) {
-        state.activeProfile = state.users.find((u) => u.id === parseInt(viewProfileBtn.dataset.userId));
-        render();
-      }
-      if (target.id === "backToProfilesBtn") { state.activeProfile = null; render(); }
-      if (target.id === "addNewProfileBtn") { state.isProfileModalOpen = true; state.activeProfile = null; render(); }
-
-      const milestoneProjectCard = target.closest(".milestone-project-card");
-      if (milestoneProjectCard) { state.activeMilestoneProjectId = parseInt(milestoneProjectCard.dataset.projectId); render(); }
-      if (target.id === "backToProjectsBtn") { state.activeMilestoneProjectId = null; render(); }
-
-      if (target.id === "addMilestoneBtn") { state.isMilestoneModalOpen = true; state.activeMilestone = null; render(); }
-
-      // Dashboard mode switcher
-      const modeBtn = target.closest(".dashboard-mode-btn");
-      if (modeBtn) { state.dashboardMode = modeBtn.dataset.mode; render(); }
-      if (target.id === "prevMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() - 1); render(); }
-      if (target.id === "nextMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() + 1); render(); }
-
-      // NEW: Resume "View" button
-      const resumeBtn = target.closest(".view-resume-btn");
-      if (resumeBtn) {
-        const url = resumeBtn.dataset.resume;
-        if (url) window.open(url, "_blank", "noopener,noreferrer");
-      }
-    });
-
-    document.body.addEventListener("change", (e) => {
-      if (e.target.matches(".task-checkbox")) {
-        const taskId = parseInt(e.target.dataset.taskId);
-        if (e.target.checked) state.selectedTasksForAI.add(taskId);
-        else state.selectedTasksForAI.delete(taskId);
-        const analyzeBtn = document.getElementById("aiAnalyzeBtn");
-        if (analyzeBtn) analyzeBtn.disabled = state.selectedTasksForAI.size === 0;
-      }
-    });
-
-    document.body.addEventListener("submit", async (e) => {
-      // Save Task
-      if (e.target.id === "taskForm") {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const taskData = {
-          content: data.content,
-          notes: data.notes,
-          assignee: data.assignee,
-          links: data.links,
-          dueDate: data.dueDate,
-          priority: data.priority,
-          aiComm: {
-            active: data.ai_active === "on",
-            frequency: data.ai_frequency,
-            days: formData.getAll("ai_days"),
-            prompt: data.ai_prompt,
-          },
-        };
-
-        const project = state.projects.find((p) => p.id === state.activeProjectId);
-        if (!project) return;
-
-        try {
-          const payload = {
-            projectId: project.id,
-            title: taskData.content,
-            description: taskData.notes || null,
-            assigneeId: null,
-            status: uiToApiStatus["Backlog"],
-            priority: uiToApiPriority[taskData.priority || "Medium"],
-            dueDate: taskData.dueDate || null,
-          };
-          await apiFetch("/api/tasks", { method: "POST", body: payload });
-          await hydrateTasksForProject(project.id);
-          state.isTaskModalOpen = false;
-        } catch (err) {
-          const msg =
-            err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
-            err?.data?.error ||
-            "Failed to create task";
-          alert(msg);
-        }
-      }
-
-      // Save Todo
-      if (e.target.id === "todoForm") {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
-        if (state.activeTodoItem) Object.assign(state.activeTodoItem, data);
-        else activeList.items.push({ id: Date.now(), ...data, subtasks: [], createdAt: Date.now() });
-        state.isTodoModalOpen = false; render();
-      }
-
-      // Save Milestone
-      if (e.target.id === "milestoneForm") {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
-        if (project) project.milestones.push({ id: Date.now(), ...data });
-        state.isMilestoneModalOpen = false; render();
-      }
-
-      // Create Project
-      if (e.target.id === "projectForm") {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const name = (fd.get("name") || "").toString().trim();
-        const description = (fd.get("description") || "").toString().trim() || null;
-
-        try {
-          const created = await apiFetch("/api/projects", { method: "POST", body: { name, description } });
-          const newProj = { id: created.id, name: created.name, description: created.description ?? "", columns: defaultColumns(), milestones: [], _tasksLoaded: false };
-          state.projects.unshift(newProj);
-          state.activeProjectId = created.id;
-          state.currentView = "dashboardView";
-          state.isProjectModalOpen = false;
-          await hydrateTasksForProject(created.id);
-        } catch (err) {
-          const msg =
-            err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
-            err?.data?.error ||
-            "Failed to create project";
-          alert(msg);
-        }
-      }
-
-      // UPDATED: Save Profile (with optional resume upload)
-      if (e.target.id === "profileForm") {
-        e.preventDefault();
-        const formEl = e.target;
-        const fd = new FormData(formEl);
-
-        // Normalize languages to JSON array string for backend
-        const langs = (fd.get("languages") || "").toString().split(",").map((s) => s.trim()).filter(Boolean);
-        fd.set("languages", JSON.stringify(langs));
-
-        try {
-          const created = await apiUpload("/api/profiles", fd);
-
-          // Update local UI list quickly
-          state.users.push({
-            id: created.id,
-            name: created.full_name,
-            title: created.title || "",
-            description: created.description || "",
-            email: created.email || "",
-            phone: created.phone || "",
-            linkedin: created.linkedin_url || "",
-            github: created.github_url || "",
-            languages: created.languages || [],
-            adminFeedback: created.admin_feedback || "",
-            avatar: "...",
-            resumeUrl: created.resume_url || null,
-          });
-
-          state.isProfileModalOpen = false;
+        if (navLink) {
+          state.currentView = navLink.dataset.view;
+          if (navLink.dataset.view === "milestonesView") state.activeMilestoneProjectId = null;
           render();
-        } catch (err) {
-          const msg =
-            err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
-            err?.data?.error ||
-            "Failed to save profile";
-          alert(msg);
         }
-      }
+
+        if (projectLink) {
+          state.activeProjectId = parseInt(projectLink.dataset.projectId);
+          state.currentView = "dashboardView";
+          const p = state.projects.find((x) => x.id === state.activeProjectId);
+          if (p && !p._tasksLoaded) await hydrateTasksForProject(p.id); else render();
+        }
+
+        // Lists & Items
+        if (target.id === "addNewListBtn") {
+          const name = prompt("New list name:");
+          if (name) state.todoLists.push({ id: Date.now(), name, items: [] });
+          render();
+        }
+
+        // Open Create Project modal
+        if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
+
+        if (target.id === "addNewTodoItemBtn") { state.isTodoModalOpen = true; state.activeTodoItem = null; render(); }
+        if (target.id === "addTaskBtn") { state.isTaskModalOpen = true; state.activeTask = null; render(); }
+        if (target.closest(".move-to-project-btn")) {
+          state.itemToMove = parseInt(target.closest("[data-item-id]").dataset.itemId);
+          state.isMoveToProjectModalOpen = true; render();
+        }
+        if (target.id === "confirmMoveBtn") {
+          const targetProjectId = parseInt(document.getElementById("projectSelectDropdown").value);
+          const project = state.projects.find((p) => p.id === targetProjectId);
+          const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
+          const itemIndex = activeList.items.findIndex((i) => i.id === state.itemToMove);
+          if (project && itemIndex > -1) {
+            const [item] = activeList.items.splice(itemIndex, 1);
+            project.columns[0].tasks.push({ id: Date.now(), content: item.content, notes: item.description, ...item });
+          }
+          state.isMoveToProjectModalOpen = false; render();
+        }
+
+        if (target.closest(".close-modal-btn")) {
+          state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
+          state.isInfoModalOpen = false; state.isMilestoneModalOpen = false; state.isProfileModalOpen = false;
+          state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
+        }
+
+        if (target.id === "aiAnalyzeBtn") { state.isAiModalOpen = true; render(); }
+
+        const taskContent = target.closest(".task-content");
+        if (taskContent) {
+          const taskId = parseInt(taskContent.dataset.taskId);
+          const project = state.projects.find((p) => p.id === state.activeProjectId);
+          for (const col of project.columns) {
+            const task = col.tasks.find((t) => t.id === taskId);
+            if (task) { state.activeTask = task; state.isTaskModalOpen = true; render(); break; }
+          }
+        }
+
+        const infoBtn = target.closest(".info-btn");
+        if (infoBtn) {
+          const key = infoBtn.dataset.info;
+          if (key === "milestones") state.infoModalContent = { title: "Milestone Planning Tips", body: "<p>Good milestones are S.M.A.R.T: Specific, Measurable, Achievable, Relevant, and Time-bound. They represent major achievements in your project, not small tasks.</p>" };
+          if (key === "taskTracking") state.infoModalContent = { title: "Task Tracking Matrix", body: "<p>Upload a CSV to see it as a grid. You can write in any cell to update it, or right-click a cell to set a color-coded status.</p>" };
+          if (key === "aiComm") state.infoModalContent = { title: "AI Automated Communication", body: "<p>When activated, the AI will automatically message the assigned developer based on your schedule to ask for updates using your custom prompt.</p>" };
+          state.isInfoModalOpen = true; render();
+        }
+
+        const viewProfileBtn = target.closest(".view-profile-btn");
+        if (viewProfileBtn) {
+          state.activeProfile = state.users.find((u) => u.id === parseInt(viewProfileBtn.dataset.userId));
+          render();
+        }
+        if (target.id === "backToProfilesBtn") { state.activeProfile = null; render(); }
+        if (target.id === "addNewProfileBtn") { state.isProfileModalOpen = true; state.activeProfile = null; render(); }
+
+        const milestoneProjectCard = target.closest(".milestone-project-card");
+        if (milestoneProjectCard) { state.activeMilestoneProjectId = parseInt(milestoneProjectCard.dataset.projectId); render(); }
+        if (target.id === "backToProjectsBtn") { state.activeMilestoneProjectId = null; render(); }
+
+        if (target.id === "addMilestoneBtn") { state.isMilestoneModalOpen = true; state.activeMilestone = null; render(); }
+
+        // Dashboard mode switcher
+        const modeBtn = target.closest(".dashboard-mode-btn");
+        if (modeBtn) { state.dashboardMode = modeBtn.dataset.mode; render(); }
+        if (target.id === "prevMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() - 1); render(); }
+        if (target.id === "nextMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() + 1); render(); }
+
+        // NEW: Resume "View" button
+        const resumeBtn = target.closest(".view-resume-btn");
+        if (resumeBtn) {
+          const url = resumeBtn.dataset.resume;
+          if (url) window.open(url, "_blank", "noopener,noreferrer");
+        }
+      });
+
+      document.body.addEventListener("change", (e) => {
+        if (e.target.matches(".task-checkbox")) {
+          const taskId = parseInt(e.target.dataset.taskId);
+          if (e.target.checked) state.selectedTasksForAI.add(taskId);
+          else state.selectedTasksForAI.delete(taskId);
+          const analyzeBtn = document.getElementById("aiAnalyzeBtn");
+          if (analyzeBtn) analyzeBtn.disabled = state.selectedTasksForAI.size === 0;
+        }
+      });
+
+      document.body.addEventListener("submit", async (e) => {
+        // Save Task
+        if (e.target.id === "taskForm") {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          const taskData = {
+            content: data.content,
+            notes: data.notes,
+            assignee: data.assignee,
+            links: data.links,
+            dueDate: data.dueDate,
+            priority: data.priority,
+            aiComm: {
+              active: data.ai_active === "on",
+              frequency: data.ai_frequency,
+              days: formData.getAll("ai_days"),
+              prompt: data.ai_prompt,
+            },
+          };
+
+          const project = state.projects.find((p) => p.id === state.activeProjectId);
+          if (!project) return;
+
+          try {
+            const payload = {
+              projectId: project.id,
+              title: taskData.content,
+              description: taskData.notes || null,
+              assigneeId: null,
+              status: uiToApiStatus["Backlog"],
+              priority: uiToApiPriority[taskData.priority || "Medium"],
+              dueDate: taskData.dueDate || null,
+            };
+            await apiFetch("/api/tasks", { method: "POST", body: payload });
+            await hydrateTasksForProject(project.id);
+            state.isTaskModalOpen = false;
+          } catch (err) {
+            const msg =
+              err?.data?.error?.formErrors?.join?.(", ") ||
+              (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+              err?.data?.error ||
+              "Failed to create task";
+            alert(msg);
+          }
+        }
+
+        // Save Todo
+        if (e.target.id === "todoForm") {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
+          if (state.activeTodoItem) Object.assign(state.activeTodoItem, data);
+          else activeList.items.push({ id: Date.now(), ...data, subtasks: [], createdAt: Date.now() });
+          state.isTodoModalOpen = false; render();
+        }
+
+        // Save Milestone
+        if (e.target.id === "milestoneForm") {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
+          if (project) project.milestones.push({ id: Date.now(), ...data });
+          state.isMilestoneModalOpen = false; render();
+        }
+
+        // Create Project
+        if (e.target.id === "projectForm") {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const name = (fd.get("name") || "").toString().trim();
+          const description = (fd.get("description") || "").toString().trim() || null;
+
+          try {
+            const created = await apiFetch("/api/projects", { method: "POST", body: { name, description } });
+            const newProj = { id: created.id, name: created.name, description: created.description ?? "", columns: defaultColumns(), milestones: [], _tasksLoaded: false };
+            state.projects.unshift(newProj);
+            state.activeProjectId = created.id;
+            state.currentView = "dashboardView";
+            state.isProjectModalOpen = false;
+            await hydrateTasksForProject(created.id);
+          } catch (err) {
+            const msg =
+              err?.data?.error?.formErrors?.join?.(", ") ||
+              (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+              err?.data?.error ||
+              "Failed to create project";
+            alert(msg);
+          }
+        }
+
+        // UPDATED: Save Profile (with optional resume upload)
+        if (e.target.id === "profileForm") {
+          e.preventDefault();
+          const formEl = e.target;
+          const fd = new FormData(formEl);
+
+          // Normalize languages to JSON array string for backend
+          const langs = (fd.get("languages") || "").toString().split(",").map((s) => s.trim()).filter(Boolean);
+          fd.set("languages", JSON.stringify(langs));
+
+          try {
+            const created = await apiUpload("/api/profiles", fd);
+
+            // Update local UI list quickly
+            state.users.push({
+              id: created.id,
+              name: created.full_name,
+              title: created.title || "",
+              description: created.description || "",
+              email: created.email || "",
+              phone: created.phone || "",
+              linkedin: created.linkedin_url || "",
+              github: created.github_url || "",
+              languages: created.languages || [],
+              adminFeedback: created.admin_feedback || "",
+              avatar: "...",
+              resumeUrl: created.resume_url || null,
+            });
+
+            state.isProfileModalOpen = false;
+            render();
+          } catch (err) {
+            const msg =
+              err?.data?.error?.formErrors?.join?.(", ") ||
+              (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+              err?.data?.error ||
+              "Failed to save profile";
+            alert(msg);
+          }
+        }
+      });
+
     });
+  </script>
+</body>
 
-  });
-</script>
-
-  </body>
 </html>
