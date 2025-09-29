@@ -129,3 +129,24 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER trg_tasks_set_updated_at
 BEFORE UPDATE ON public.tasks
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Developer profiles (one per person; may or may not map to an auth user)
+CREATE TABLE IF NOT EXISTS profiles (
+  id            BIGSERIAL PRIMARY KEY,
+  user_id       BIGINT REFERENCES users(id) ON DELETE SET NULL, -- optional link to auth user
+  full_name     TEXT NOT NULL,
+  title         TEXT,
+  description   TEXT,
+  email         TEXT,
+  phone         TEXT,
+  linkedin_url  TEXT,
+  github_url    TEXT,
+  languages     TEXT[] DEFAULT '{}',       -- e.g. '{JavaScript,SQL,Python}'
+  admin_feedback TEXT,
+  resume_url    TEXT,                      -- path/URL to uploaded resume (PDF, etc.)
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_fullname ON profiles (full_name);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
