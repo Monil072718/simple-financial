@@ -17,9 +17,9 @@
       href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
       rel="stylesheet"
     />
-    <!-- PDF Export Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- PDF Export Libraries (used elsewhere in app) -->
+    <script src="="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
       body { font-family: "Inter", sans-serif; }
@@ -31,10 +31,7 @@
       .overflow-x-auto::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
       .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #6b7280; }
       .highlight { animation: highlight-fade 2.5s ease-out; }
-      @keyframes highlight-fade {
-        0%,10% { background:#fef08a; color:#1f2937; }
-        100% { background:#374151; color:#e5e7eb; }
-      }
+      @keyframes highlight-fade { 0%,10% { background:#fef08a; color:#1f2937; } 100% { background:#374151; color:#e5e7eb; } }
       #csvGrid table { border-collapse: collapse; width: 100%; }
       #csvGrid th, #csvGrid td { border: 1px solid #4b5563; padding: 8px; text-align: left; }
       #csvGrid th { background: #374151; }
@@ -151,6 +148,8 @@
 
     <!-- =========== MODALS (containers only; content is rendered by JS) =========== -->
     <div id="modalsContainer"></div>
+
+    <!-- Color picker for grid (unchanged) -->
     <div id="colorPickerModal" class="hidden absolute bg-gray-700 rounded-lg shadow-xl p-2 z-50">
       <div class="grid grid-cols-4 gap-1">
         <div class="w-6 h-6 rounded bg-green-500 cursor-pointer" data-color="bg-green-500"></div>
@@ -166,17 +165,14 @@
 
     <script>
   // jsPDF usage in other views
-  const { jsPDF } = window.jspdf;
+  const { jsPDF } = window.jspdf || {};
 
   // ====================== API HELPERS (Same-origin) ======================
   const API_BASE = ""; // same origin (http://localhost:3000)
   const LS_TOKEN_KEY = "nf_token";
   const LS_USER_KEY = "nf_user";
 
-  async function apiFetch(
-    path,
-    { method = "GET", body, headers = {} } = {}
-  ) {
+  async function apiFetch(path, { method = "GET", body, headers = {} } = {}) {
     const token = localStorage.getItem(LS_TOKEN_KEY);
     const res = await fetch(`${API_BASE}${path}`, {
       method,
@@ -199,7 +195,7 @@
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers,       // browser sets Content-Type boundary automatically
+      headers, // browser sets boundary automatically
       body: formData,
       credentials: "same-origin",
     });
@@ -223,16 +219,7 @@
   }
 
   // ==== Task & Priority mappers (UI <-> API) ====
-  const UI_COLS = [
-    "Backlog",
-    "Pending",
-    "Assigned",
-    "In Progress",
-    "Waiting to Review",
-    "Finished",
-  ];
-
-  // UI column title -> API status
+  const UI_COLS = ["Backlog","Pending","Assigned","In Progress","Waiting to Review","Finished"];
   const uiToApiStatus = {
     Backlog: "todo",
     Pending: "pending",
@@ -241,29 +228,10 @@
     "Waiting to Review": "review",
     Finished: "done",
   };
-
-  // API status -> UI column title
-  const apiToUiStatus = Object.fromEntries(
-    Object.entries(uiToApiStatus).map(([k, v]) => [v, k])
-  );
-
-  // UI <-> API priority
-  const uiToApiPriority = {
-    Low: "low",
-    Medium: "medium",
-    High: "high",
-    Urgent: "urgent",
-  };
-  const apiToUiPriority = {
-    low: "Low",
-    medium: "Medium",
-    high: "High",
-    urgent: "Urgent",
-  };
-
-  function columnTitleToIndex(title) {
-    return UI_COLS.indexOf(title);
-  }
+  const apiToUiStatus = Object.fromEntries(Object.entries(uiToApiStatus).map(([k,v]) => [v,k]));
+  const uiToApiPriority = { Low:"low", Medium:"medium", High:"high", Urgent:"urgent" };
+  const apiToUiPriority = { low:"Low", medium:"Medium", high:"High", urgent:"Urgent" };
+  function columnTitleToIndex(title) { return UI_COLS.indexOf(title); }
 
   // ====================== APP ======================
   document.addEventListener("DOMContentLoaded", () => {
@@ -273,46 +241,28 @@
     const appView = document.getElementById("appView");
     const modalsContainer = document.getElementById("modalsContainer");
     const viewTitle = document.getElementById("viewTitle");
-
     const goToRegister = document.getElementById("goToRegister");
     const goToLogin = document.getElementById("goToLogin");
 
     // Simple view routing
     function showLogin() {
-      loginView.classList.remove("hidden");
-      loginView.classList.add("flex");
-      registerView.classList.add("hidden");
-      registerView.classList.remove("flex");
-      appView.classList.add("hidden");
-      history.replaceState(null, "", "#/login");
+      loginView.classList.remove("hidden"); loginView.classList.add("flex");
+      registerView.classList.add("hidden"); registerView.classList.remove("flex");
+      appView.classList.add("hidden"); history.replaceState(null, "", "#/login");
     }
     function showRegister() {
-      loginView.classList.add("hidden");
-      loginView.classList.remove("flex");
-      registerView.classList.remove("hidden");
-      registerView.classList.add("flex");
-      appView.classList.add("hidden");
-      history.replaceState(null, "", "#/register");
+      loginView.classList.add("hidden"); loginView.classList.remove("flex");
+      registerView.classList.remove("hidden"); registerView.classList.add("flex");
+      appView.classList.add("hidden"); history.replaceState(null, "", "#/register");
     }
     function showApp() {
-      loginView.classList.add("hidden");
-      registerView.classList.add("hidden");
-      appView.classList.remove("hidden");
-      history.replaceState(null, "", "#/app");
+      loginView.classList.add("hidden"); registerView.classList.add("hidden");
+      appView.classList.remove("hidden"); history.replaceState(null, "", "#/app");
     }
 
-    if (location.hash === "#/register") showRegister();
-    else showLogin();
-    if (goToRegister)
-      goToRegister.addEventListener("click", (e) => {
-        e.preventDefault();
-        showRegister();
-      });
-    if (goToLogin)
-      goToLogin.addEventListener("click", (e) => {
-        e.preventDefault();
-        showLogin();
-      });
+    if (location.hash === "#/register") showRegister(); else showLogin();
+    if (goToRegister) goToRegister.addEventListener("click", (e) => { e.preventDefault(); showRegister(); });
+    if (goToLogin) goToLogin.addEventListener("click", (e) => { e.preventDefault(); showLogin(); });
 
     // ---------- State ----------
     let state = {
@@ -321,7 +271,7 @@
       dashboardMode: "board",
       profileViewMode: "grid",
       calendarDate: new Date(),
-      activeProjectId: null, // becomes first project after hydrate
+      activeProjectId: null,
       activeTodoListId: 1,
       activeMilestoneProjectId: null,
       activeTask: null,
@@ -335,7 +285,7 @@
       isMilestoneModalOpen: false,
       isProfileModalOpen: false,
       isAiModalOpen: false,
-      isProjectModalOpen: false, // NEW
+      isProjectModalOpen: false,
 
       infoModalContent: { title: "", body: "" },
       activeMilestone: null,
@@ -343,16 +293,7 @@
       selectedTasksForAI: new Set(),
 
       gridData: [
-        [
-          "Task Name",
-          "Assignee",
-          "Mon",
-          "Tue",
-          "Wed",
-          "Thu",
-          "Fri",
-          "Status",
-        ],
+        ["Task Name","Assignee","Mon","Tue","Wed","Thu","Fri","Status"],
         [
           { text: "API Endpoint Design", color: "" },
           { text: "John S.", color: "" },
@@ -375,9 +316,7 @@
         ],
       ],
 
-      // Projects hydrate from API
       projects: [],
-
       todoLists: [
         {
           id: 1,
@@ -401,6 +340,7 @@
           ],
         },
       ],
+      // This will be overwritten by hydrateProfiles()
       users: [
         {
           id: 1,
@@ -414,6 +354,7 @@
           languages: ["JavaScript", "SQL", "Python"],
           adminFeedback: "Consistently delivers high-quality, scalable code.",
           avatar: "...",
+          resumeUrl: null,
         },
       ],
       communicationLogs: [
@@ -422,8 +363,7 @@
           timestamp: "2025-09-15 10:30 AM",
           recipient: "John Smith",
           summary: "Update on task #103",
-          message:
-            "Hey John, just wanted to check on the progress for the API authentication endpoint. Let me know if you need any help.",
+          message: "Hey John, just wanted to check on the progress for the API authentication endpoint. Let me know if you need any help.",
         },
       ],
     };
@@ -435,7 +375,6 @@
       Urgent: "bg-red-500/20 text-red-300",
     };
 
-    // ---------- Helpers ----------
     const defaultColumns = () => [
       { id: Date.now(), title: "Backlog", tasks: [] },
       { id: Date.now() + 1, title: "Pending", tasks: [] },
@@ -474,13 +413,7 @@
         console.warn("Failed to load projects, showing local sample:", err);
         if (!state.projects.length) {
           state.projects = [
-            {
-              id: 1,
-              name: "Sample Project",
-              columns: defaultColumns(),
-              milestones: [],
-              _tasksLoaded: true,
-            },
+            { id: 1, name: "Sample Project", columns: defaultColumns(), milestones: [], _tasksLoaded: true },
           ];
           state.activeProjectId = 1;
         }
@@ -489,14 +422,36 @@
       else render();
     }
 
+    // ===== Hydrate Profiles from API =====
+    async function hydrateProfiles() {
+      try {
+        const rows = await apiFetch("/api/profiles?q=&page=1&limit=100");
+        state.users = rows.map((r) => ({
+          id: r.id,
+          name: r.full_name,
+          title: r.title || "",
+          description: r.description || "",
+          email: r.email || "",
+          phone: r.phone || "",
+          linkedin: r.linkedin_url || "",
+          github: r.github_url || "",
+          languages: Array.isArray(r.languages) ? r.languages : [],
+          adminFeedback: r.admin_feedback || "",
+          avatar: "...",
+          resumeUrl: r.resume_url || null,
+        }));
+        if (state.currentView === "profileView") render();
+      } catch (err) {
+        console.warn("Failed to load profiles:", err);
+      }
+    }
+
     // ===== Hydrate Tasks for one Project =====
     async function hydrateTasksForProject(projectId) {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return;
 
-      // clear existing
       project.columns.forEach((c) => (c.tasks = []));
-
       try {
         const tasks = await apiFetch(`/api/tasks?projectId=${projectId}&limit=200`);
         (tasks || []).forEach((t) => {
@@ -504,7 +459,7 @@
             id: t.id,
             content: t.title,
             notes: t.description || "",
-            assignee: null, // TODO: map assigneeId -> user.name when available
+            assignee: null,
             links: "",
             dueDate: t.due_date || t.dueDate || "",
             priority: apiToUiPriority[t.priority] || "Medium",
@@ -530,24 +485,16 @@
       const email = document.getElementById("email").value.trim().toLowerCase();
       const password = document.getElementById("password").value;
       try {
-        const { token, user } = await apiFetch("/api/auth/login", {
-          method: "POST",
-          body: { email, password },
-        });
+        const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
         saveAuth({ token, user });
-        state.currentUser = {
-          email: user.email,
-          name: user.name,
-          role: user.role || "member",
-        };
-        document.getElementById(
-          "currentUserDisplay"
-        ).innerHTML = `<p class="font-semibold text-sm">${state.currentUser.name}</p>
-               <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        document.getElementById("commNavLink").style.display =
-          state.currentUser.role === "admin" ? "flex" : "none";
+        state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
+        document.getElementById("currentUserDisplay").innerHTML =
+          `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
         showApp();
         await hydrateProjects();
+        await hydrateProfiles();
       } catch (err) {
         alert(err?.data?.error || "Invalid email or password.");
       }
@@ -561,33 +508,21 @@
       const email = document.getElementById("reg_email").value.trim().toLowerCase();
       const password = document.getElementById("reg_password").value;
       try {
-        await apiFetch("/api/users", {
-          method: "POST",
-          body: { name, email, password },
-        });
-        const { token, user } = await apiFetch("/api/auth/login", {
-          method: "POST",
-          body: { email, password },
-        });
+        await apiFetch("/api/users", { method: "POST", body: { name, email, password } });
+        const { token, user } = await apiFetch("/api/auth/login", { method: "POST", body: { email, password } });
         saveAuth({ token, user });
-        state.currentUser = {
-          email: user.email,
-          name: user.name,
-          role: user.role || "member",
-        };
-        document.getElementById(
-          "currentUserDisplay"
-        ).innerHTML = `<p class="font-semibold text-sm">${state.currentUser.name}</p>
-               <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        document.getElementById("commNavLink").style.display =
-          state.currentUser.role === "admin" ? "flex" : "none";
+        state.currentUser = { email: user.email, name: user.name, role: user.role || "member" };
+        document.getElementById("currentUserDisplay").innerHTML =
+          `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+           <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
         showApp();
         await hydrateProjects();
+        await hydrateProfiles();
       } catch (err) {
         const msg =
           err?.data?.error?.formErrors?.join?.(", ") ||
-          (err?.data?.error?.fieldErrors &&
-            Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+          (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
           err?.data?.error ||
           "Registration failed";
         alert(msg);
@@ -597,19 +532,14 @@
     // ---------- Restore session ----------
     const saved = loadAuth();
     if (saved?.user) {
-      state.currentUser = {
-        email: saved.user.email,
-        name: saved.user.name,
-        role: saved.user.role || "member",
-      };
-      document.getElementById(
-        "currentUserDisplay"
-      ).innerHTML = `<p class="font-semibold text-sm">${state.currentUser.name}</p>
-             <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-      document.getElementById("commNavLink").style.display =
-        state.currentUser.role === "admin" ? "flex" : "none";
+      state.currentUser = { email: saved.user.email, name: saved.user.name, role: saved.user.role || "member" };
+      document.getElementById("currentUserDisplay").innerHTML =
+        `<p class="font-semibold text-sm">${state.currentUser.name}</p>
+         <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
+      document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
       showApp();
-      hydrateProjects(); // no await
+      hydrateProjects();
+      hydrateProfiles();
     }
 
     // ---------- Logout ----------
@@ -630,22 +560,13 @@
     }
     function renderProjectsNav() {
       const nav = document.getElementById("projectNav");
-      nav.innerHTML = state.projects
-        .map(
-          (p) => `
-            <li>
-              <a href="#" data-project-id="${p.id}"
-                 class="project-link flex justify-between items-center px-4 py-2 rounded-lg ${
-                   p.id === state.activeProjectId &&
-                   state.currentView === "dashboardView"
-                     ? "bg-gray-700 text-gray-200"
-                     : "text-gray-400 hover:bg-gray-700/50"
-                 }">
-                <span>${p.name}</span>
-              </a>
-            </li>`
-        )
-        .join("");
+      nav.innerHTML = state.projects.map((p) => `
+        <li>
+          <a href="#" data-project-id="${p.id}"
+             class="project-link flex justify-between items-center px-4 py-2 rounded-lg ${p.id === state.activeProjectId && state.currentView === "dashboardView" ? "bg-gray-700 text-gray-200" : "text-gray-400 hover:bg-gray-700/50"}">
+            <span>${p.name}</span>
+          </a>
+        </li>`).join("");
     }
     function renderMainNavLinkStates() {
       document.querySelectorAll("#mainNav .nav-link").forEach((l) => {
@@ -658,35 +579,15 @@
       switch (state.currentView) {
         case "dashboardView": {
           const p = state.projects.find((p) => p.id === state.activeProjectId);
-          if (p) {
-            viewTitle.textContent = `${p.name} Dashboard`;
-            content = renderDashboard(p);
-          } else {
-            viewTitle.textContent = "Dashboard";
-            content = `<div class="p-6 text-gray-400">No project selected.</div>`;
-          }
+          if (p) { viewTitle.textContent = `${p.name} Dashboard`; content = renderDashboard(p); }
+          else { viewTitle.textContent = "Dashboard"; content = `<div class="p-6 text-gray-400">No project selected.</div>`; }
           break;
         }
-        case "todoView":
-          viewTitle.textContent = "To-Do Lists";
-          content = renderTodoView();
-          break;
-        case "taskTrackingView":
-          viewTitle.textContent = "Task Tracking Matrix";
-          content = renderTaskTrackingView();
-          break;
-        case "communicationView":
-          viewTitle.textContent = "Communication";
-          content = renderCommunicationView();
-          break;
-        case "profileView":
-          viewTitle.textContent = "Developer Profiles";
-          content = renderProfileView();
-          break;
-        case "milestonesView":
-          viewTitle.textContent = "Milestones";
-          content = renderMilestonesView();
-          break;
+        case "todoView": viewTitle.textContent = "To-Do Lists"; content = renderTaskTrackingView(); break;
+        case "taskTrackingView": viewTitle.textContent = "Task Tracking Matrix"; content = renderTaskTrackingView(); break;
+        case "communicationView": viewTitle.textContent = "Communication"; content = renderCommunicationView(); break;
+        case "profileView": viewTitle.textContent = "Developer Profiles"; content = renderProfileView(); break;
+        case "milestonesView": viewTitle.textContent = "Milestones"; content = renderMilestonesView(); break;
       }
       document.getElementById("mainContent").innerHTML = content;
 
@@ -696,8 +597,7 @@
         if (state.dashboardMode === "table") renderTableView(project);
         if (state.dashboardMode === "calendar") renderCalendarView(project);
       }
-      if (state.currentView === "taskTrackingView")
-        renderCsvAsGrid(state.gridData);
+      if (state.currentView === "taskTrackingView") renderCsvAsGrid(state.gridData);
     }
 
     function renderDashboard(project) {
@@ -765,9 +665,7 @@
       const container = document.getElementById("kanbanCalendarView");
       if (!container) return;
       const tasks = project.columns.flatMap((c) => c.tasks);
-      const date = state.calendarDate,
-        year = date.getFullYear(),
-        month = date.getMonth();
+      const date = state.calendarDate, year = date.getFullYear(), month = date.getMonth();
       const firstDay = new Date(year, month, 1).getDay();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const monthName = date.toLocaleString("default", { month: "long" });
@@ -782,22 +680,16 @@
           ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="text-center font-semibold text-xs py-2 bg-gray-800">${d}</div>`).join("")}`;
       for (let i = 0; i < firstDay; i++) html += `<div class="bg-gray-800/50"></div>`;
       for (let day = 1; day <= daysInMonth; day++) {
-        const dayTasks = tasks.filter(
-          (t) =>
-            t.dueDate &&
-            new Date(t.dueDate).getFullYear() === year &&
-            new Date(t.dueDate).getMonth() === month &&
-            new Date(t.dueDate).getDate() === day
+        const dayTasks = tasks.filter((t) =>
+          t.dueDate &&
+          new Date(t.dueDate).getFullYear() === year &&
+          new Date(t.dueDate).getMonth() === month &&
+          new Date(t.dueDate).getDate() === day
         );
         html += `<div class="bg-gray-800 p-2 calendar-day overflow-y-auto">
           <div class="font-semibold text-right text-sm">${day}</div>
           <div class="space-y-1 mt-1">
-            ${dayTasks
-              .map(
-                (t) =>
-                  `<div class="text-xs bg-cyan-600 p-1 rounded cursor-pointer task-content" data-task-id="${t.id}">${t.content}</div>`
-              )
-              .join("")}
+            ${dayTasks.map((t) => `<div class="text-xs bg-cyan-600 p-1 rounded cursor-pointer task-content" data-task-id="${t.id}">${t.content}</div>`).join("")}
           </div>
         </div>`;
       }
@@ -812,23 +704,12 @@
         return;
       }
       let table = '<table id="csvGridTable" class="w-full">';
-      table +=
-        "<thead><tr>" +
-        data[0].map((h) => `<th>${h}</th>`).join("") +
-        "</tr></thead>";
+      table += "<thead><tr>" + data[0].map((h) => `<th>${h}</th>`).join("") + "</tr></thead>";
       table += "<tbody>";
       data.slice(1).forEach((row, ri) => {
-        table +=
-          "<tr>" +
-          row
-            .map(
-              (cell, ci) =>
-                `<td contenteditable="true" class="${cell.color || ""}" data-row="${
-                  ri + 1
-                }" data-col="${ci}">${cell.text}</td>`
-            )
-            .join("") +
-          "</tr>";
+        table += "<tr>" + row.map((cell, ci) =>
+          `<td contenteditable="true" class="${cell.color || ""}" data-row="${ri + 1}" data-col="${ci}">${cell.text}</td>`
+        ).join("") + "</tr>";
       });
       table += "</tbody></table>";
       container.innerHTML = table;
@@ -846,6 +727,8 @@
         <div id="csvGrid" class="bg-gray-800 p-4 rounded-xl border border-gray-700 overflow-auto"></div>
       </div>`;
     }
+
+    // ---------- Profile View (uses state.users hydrated from backend) ----------
     function renderProfileView() {
       let content = `<div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold">Developer Profiles</h2><button id="addNewProfileBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>Add New Profile</button></div>`;
       if (state.activeProfile) {
@@ -853,52 +736,45 @@
         content = `<button id="backToProfilesBtn" class="text-gray-400 hover:text-white mb-4">&larr; Back to List</button>
           <div class="bg-gray-800 p-8 rounded-xl border border-gray-700">
             <h2 class="text-2xl font-bold">${p.name}</h2><p class="text-cyan-400">${p.title}</p>
-            <div class="mt-4"><strong class="text-gray-400">Description:</strong><p>${p.description}</p></div>
+            <div class="mt-4"><strong class="text-gray-400">Description:</strong><p>${p.description || "-"}</p></div>
             <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
-              <p><strong class="text-gray-400">Email:</strong> ${p.email}</p>
-              <p><strong class="text-gray-400">Phone:</strong> ${p.phone}</p>
-              <p><strong class="text-gray-400">LinkedIn:</strong> <a href="${p.linkedin}" class="text-cyan-400 hover:underline" target="_blank">${p.linkedin}</a></p>
-              <p><strong class="text-gray-400">GitHub:</strong> <a href="${p.github}" class="text-cyan-400 hover:underline" target="_blank">${p.github}</a></p>
+              <p><strong class="text-gray-400">Email:</strong> ${p.email || "-"}</p>
+              <p><strong class="text-gray-400">Phone:</strong> ${p.phone || "-"}</p>
+              <p><strong class="text-gray-400">LinkedIn:</strong> ${p.linkedin ? `<a href="${p.linkedin}" class="text-cyan-400 hover:underline" target="_blank">${p.linkedin}</a>` : "-"}</p>
+              <p><strong class="text-gray-400">GitHub:</strong> ${p.github ? `<a href="${p.github}" class="text-cyan-400 hover:underline" target="_blank">${p.github}</a>` : "-"}</p>
             </div>
             <div class="mt-4"><strong class="text-gray-400">Coding Languages:</strong>
-              <div class="flex flex-wrap gap-2 mt-1">${p.languages
-                .map(
-                  (l) =>
-                    `<span class="bg-gray-700 text-cyan-300 text-xs font-medium px-2 py-1 rounded-full">${l}</span>`
-                )
-                .join("")}</div>
+              <div class="flex flex-wrap gap-2 mt-1">${(p.languages || []).map((l) => `<span class="bg-gray-700 text-cyan-300 text-xs font-medium px-2 py-1 rounded-full">${l}</span>`).join("")}</div>
             </div>
-            <div class="mt-4"><strong class="text-gray-400">Admin Feedback:</strong><p class="bg-gray-900/50 p-2 rounded-lg">${p.adminFeedback}</p></div>
-            <div class="mt-4"><button class="text-sm bg-gray-700 p-2 rounded-lg">View Resume</button></div>
+            <div class="mt-4"><strong class="text-gray-400">Admin Feedback:</strong><p class="bg-gray-900/50 p-2 rounded-lg">${p.adminFeedback || "-"}</p></div>
+            <div class="mt-4">
+              ${p.resumeUrl
+                ? `<button class="text-sm bg-gray-700 p-2 rounded-lg view-resume-btn" data-resume="${p.resumeUrl}">View Resume</button>`
+                : `<span class="text-sm text-gray-500">No resume uploaded</span>`}
+            </div>
           </div>`;
       } else {
-        content += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${state.users
-          .map((u) => createProfileCardHTML(u))
-          .join("")}</div>`;
+        content += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${state.users.map((u) => createProfileCardHTML(u)).join("")}</div>`;
       }
       return `<div class="p-6 max-w-5xl mx-auto">${content}</div>`;
     }
     function createProfileCardHTML(user) {
       return `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
         <h3 class="font-bold text-lg">${user.name}</h3>
-        <p class="text-sm text-cyan-400">${user.title}</p>
-        <div class="mt-2 flex flex-wrap gap-1">${user.languages
-          .slice(0, 3)
-          .map(
-            (l) =>
-              `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${l}</span>`
-          )
-          .join("")}</div>
-        <button data-user-id="${user.id}" class="view-profile-btn text-sm text-cyan-400 hover:underline mt-4">View Details</button>
+        <p class="text-sm text-cyan-400">${user.title || ""}</p>
+        <div class="mt-2 flex flex-wrap gap-1">${(user.languages || []).slice(0, 3).map((l) => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded-full">${l}</span>`).join("")}</div>
+        <div class="flex gap-2 mt-4">
+          ${user.resumeUrl ? `<button class="view-resume-btn text-xs bg-gray-700 px-2 py-1 rounded" data-resume="${user.resumeUrl}">Resume</button>` : ""}
+          <button data-user-id="${user.id}" class="view-profile-btn text-sm text-cyan-400 hover:underline">View Details</button>
+        </div>
       </div>`;
     }
+
     function renderCommunicationView() {
       if (state.currentUser.role !== "admin") {
         return `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
       }
-      const activeComms = state.projects
-        .flatMap((p) => p.columns.flatMap((c) => c.tasks))
-        .filter((t) => t.aiComm && t.aiComm.active);
+      const activeComms = state.projects.flatMap((p) => p.columns.flatMap((c) => c.tasks)).filter((t) => t.aiComm && t.aiComm.active);
       return `<div class="p-6">
         <h2 class="text-2xl font-bold mb-6">Active AI Communications</h2>
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8">
@@ -907,21 +783,13 @@
               <tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Developer</th><th class="px-6 py-3">Frequency</th><th class="px-6 py-3">Days</th><th class="px-6 py-3">Next Message</th></tr>
             </thead>
             <tbody>
-              ${
-                activeComms
-                  .map(
-                    (task) =>
-                      `<tr class="border-b border-gray-700">
-                    <td class="px-6 py-4">${task.content}</td>
-                    <td class="px-6 py-4">${task.assignee || "Unassigned"}</td>
-                    <td class="px-6 py-4">${task.aiComm.frequency}</td>
-                    <td class="px-6 py-4">${(task.aiComm.days || []).join(", ")}</td>
-                    <td class="px-6 py-4">Tomorrow 9:00 AM</td>
-                  </tr>`
-                  )
-                  .join("") ||
-                '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'
-              }
+              ${activeComms.map((task) => `<tr class="border-b border-gray-700">
+                <td class="px-6 py-4">${task.content}</td>
+                <td class="px-6 py-4">${task.assignee || "Unassigned"}</td>
+                <td class="px-6 py-4">${task.aiComm.frequency}</td>
+                <td class="px-6 py-4">${(task.aiComm.days || []).join(", ")}</td>
+                <td class="px-6 py-4">Tomorrow 9:00 AM</td>
+              </tr>`).join("") || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -931,40 +799,26 @@
             <thead class="text-xs text-gray-400 uppercase bg-gray-700/50">
               <tr><th class="px-6 py-3">Timestamp</th><th class="px-6 py-3">Recipient</th><th class="px-6 py-3">Summary</th></tr>
             </thead>
-            <tbody>${
-              state.communicationLogs
-                .map(
-                  (log) =>
-                    `<tr class="border-b border-gray-700"><td class="px-6 py-4">${log.timestamp}</td><td class="px-6 py-4">${log.recipient}</td><td class="px-6 py-4">${log.summary}</td></tr>`
-                )
-                .join("") ||
-              '<tr><td colspan="3" class="text-center p-4 text-gray-500">No messages logged yet.</td></tr>'
-            }</tbody>
+            <tbody>${state.communicationLogs.map((log) => `<tr class="border-b border-gray-700"><td class="px-6 py-4">${log.timestamp}</td><td class="px-6 py-4">${log.recipient}</td><td class="px-6 py-4">${log.summary}</td></tr>`).join("") || '<tr><td colspan="3" class="text-center p-4 text-gray-500">No messages logged yet.</td></tr>'}</tbody>
           </table>
         </div>
       </div>`;
     }
+
     function renderMilestonesView() {
       let content = "";
       if (state.activeMilestoneProjectId === null) {
         content = `<div class="p-6">
           <h2 class="text-2xl font-bold mb-4">Select a project to view its milestones</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            ${state.projects
-              .map(
-                (p) =>
-                  `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700 cursor-pointer hover:border-cyan-500 milestone-project-card" data-project-id="${p.id}">
+            ${state.projects.map((p) => `<div class="bg-gray-800 p-6 rounded-xl border border-gray-700 cursor-pointer hover:border-cyan-500 milestone-project-card" data-project-id="${p.id}">
                 <h3 class="font-bold text-lg">${p.name}</h3>
                 <p class="text-sm text-gray-400">${p.milestones.length} milestones</p>
-              </div>`
-              )
-              .join("")}
+              </div>`).join("")}
           </div>
         </div>`;
       } else {
-        const project = state.projects.find(
-          (p) => p.id === state.activeMilestoneProjectId
-        );
+        const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
         content = `<div class="p-6 max-w-4xl mx-auto">
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-4">
@@ -977,10 +831,7 @@
             <button id="addMilestoneBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><span class="material-icons-outlined">add</span>New Milestone</button>
           </div>
           <div class="relative border-l-2 border-gray-700 pl-8 space-y-12">
-            ${
-              project.milestones.map((m) => createMilestoneHTML(m)).join("") ||
-              '<p class="text-gray-500">No milestones for this project yet.</p>'
-            }
+            ${project.milestones.map((m) => createMilestoneHTML(m)).join("") || '<p class="text-gray-500">No milestones for this project yet.</p>'}
           </div>
         </div>`;
       }
@@ -1017,16 +868,13 @@
       if (state.isMilestoneModalOpen) modalsContainer.innerHTML += createMilestoneModalHTML();
       if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
       if (state.isAiModalOpen) modalsContainer.innerHTML += createAiModalHTML();
-      if (state.isProjectModalOpen) modalsContainer.innerHTML += createProjectModalHTML(); // NEW
+      if (state.isProjectModalOpen) modalsContainer.innerHTML += createProjectModalHTML();
     }
 
-    // NEW: Create Project Modal
     function createProjectModalHTML() {
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <form id="projectForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
-          <div class="p-6 border-b border-gray-700">
-            <h2 class="text-2xl font-bold">Create Project</h2>
-          </div>
+          <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">Create Project</h2></div>
           <div class="p-6 space-y-4">
             <input name="name" placeholder="Project Name" class="w-full bg-gray-700 p-2 rounded-lg" required />
             <textarea name="description" placeholder="Description" class="w-full bg-gray-700 p-2 rounded-lg h-24"></textarea>
@@ -1042,23 +890,10 @@
     function createTaskModalHTML() {
       const task = state.activeTask;
       const isNew = !task;
-      const taskData = isNew
-        ? {
-            content: "",
-            notes: "",
-            priority: "Medium",
-            dueDate: "",
-            assignee: null,
-            subtasks: [],
-            links: "",
-            aiComm: {
-              active: false,
-              frequency: "daily",
-              days: [],
-              prompt: "",
-            },
-          }
-        : task;
+      const taskData = isNew ? {
+        content: "", notes: "", priority: "Medium", dueDate: "", assignee: null, subtasks: [],
+        links: "", aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
+      } : task;
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="taskForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Create Task" : "Edit Task"}</h2></div>
@@ -1077,12 +912,9 @@
                 <div class="${taskData.aiComm.active ? "" : "hidden"}">
                   <select class="w-full bg-gray-700 p-2 rounded-lg mb-2" name="ai_frequency"><option>daily</option><option>weekly</option></select>
                   <div class="flex gap-2 mb-2">
-                    ${["Mon", "Tue", "Wed", "Thu", "Fri"]
-                      .map(
-                        (d) =>
-                          `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? "checked" : ""}> ${d}</label>`
-                      )
-                      .join("")}
+                    ${["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) =>
+                      `<label class="flex items-center gap-1 text-sm"><input type="checkbox" name="ai_days" value="${d}" ${taskData.aiComm.days.includes(d) ? "checked" : ""}> ${d}</label>`
+                    ).join("")}
                   </div>
                   <textarea name="ai_prompt" class="w-full bg-gray-700 p-2 rounded-lg h-20" placeholder="What should the AI ask? e.g., 'Any blockers? What's your estimated completion?'">${taskData.aiComm.prompt}</textarea>
                 </div>
@@ -1092,12 +924,7 @@
               <input class="w-full bg-gray-700 p-2 rounded-lg" type="date" name="dueDate" value="${taskData.dueDate}">
               <select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg">
                 <option value="">Unassigned</option>
-                ${state.users
-                  .map(
-                    (u) =>
-                      `<option value="${u.name}" ${taskData.assignee === u.name ? "selected" : ""}>${u.name}</option>`
-                  )
-                  .join("")}
+                ${state.users.map((u) => `<option value="${u.name}" ${taskData.assignee === u.name ? "selected" : ""}>${u.name}</option>`).join("")}
                 <option value="add_new">-- Add New --</option>
               </select>
             </div>
@@ -1109,21 +936,13 @@
         </form>
       </div>`;
     }
+
     function createTodoModalHTML() {
       const item = state.activeTodoItem;
       const isNew = !item;
-      const data = isNew
-        ? {
-            content: "",
-            description: "",
-            links: "",
-            priority: "Medium",
-            dueDate: "",
-            assignee: null,
-            thingsToConsider: "",
-            subtasks: [],
-          }
-        : item;
+      const data = isNew ? {
+        content: "", description: "", links: "", priority: "Medium", dueDate: "", assignee: null, thingsToConsider: "", subtasks: [],
+      } : item;
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="todoForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Add" : "Edit"} To-Do Item</h2></div>
@@ -1134,22 +953,13 @@
             <textarea name="thingsToConsider" class="w-full bg-gray-700 p-2 rounded-lg h-20" placeholder="Things to consider...">${data.thingsToConsider}</textarea>
             <div class="grid grid-cols-2 gap-4">
               <select name="priority" class="w-full bg-gray-700 p-2 rounded-lg">
-                ${Object.keys(priorityStyles)
-                  .map(
-                    (p) => `<option ${data.priority === p ? "selected" : ""}>${p}</option>`
-                  )
-                  .join("")}
+                ${Object.keys(priorityStyles).map((p) => `<option ${data.priority === p ? "selected" : ""}>${p}</option>`).join("")}
               </select>
               <input type="date" name="dueDate" value="${data.dueDate}" class="w-full bg-gray-700 p-2 rounded-lg">
             </div>
             <select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg">
               <option value="">Unassigned</option>
-              ${state.users
-                .map(
-                  (u) =>
-                    `<option value="${u.name}" ${data.assignee === u.name ? "selected" : ""}>${u.name}</option>`
-                )
-                .join("")}
+              ${state.users.map((u) => `<option value="${u.name}" ${data.assignee === u.name ? "selected" : ""}>${u.name}</option>`).join("")}
             </select>
           </div>
           <div class="p-6 border-t border-gray-700 flex justify-end gap-4">
@@ -1159,6 +969,7 @@
         </form>
       </div>`;
     }
+
     function createMoveToProjectModalHTML() {
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
@@ -1175,6 +986,7 @@
         </div>
       </div>`;
     }
+
     function createInfoModalHTML() {
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
@@ -1186,12 +998,11 @@
         </div>
       </div>`;
     }
+
     function createMilestoneModalHTML() {
       const milestone = state.activeMilestone;
       const isNew = !milestone;
-      const data = isNew
-        ? { title: "", description: "", dueDate: "", priority: "Medium", difficulty: "Medium" }
-        : milestone;
+      const data = isNew ? { title: "", description: "", dueDate: "", priority: "Medium", difficulty: "Medium" } : milestone;
       return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
         <form id="milestoneForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-700">
           <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Create" : "Edit"} Milestone</h2></div>
@@ -1234,6 +1045,7 @@
         </form>
       </div>`;
     }
+
     function createAiModalHTML() {
       let content = "";
       state.selectedTasksForAI.forEach((taskId) => {
@@ -1268,8 +1080,7 @@
 
       if (navLink) {
         state.currentView = navLink.dataset.view;
-        if (navLink.dataset.view === "milestonesView")
-          state.activeMilestoneProjectId = null;
+        if (navLink.dataset.view === "milestonesView") state.activeMilestoneProjectId = null;
         render();
       }
 
@@ -1277,11 +1088,7 @@
         state.activeProjectId = parseInt(projectLink.dataset.projectId);
         state.currentView = "dashboardView";
         const p = state.projects.find((x) => x.id === state.activeProjectId);
-        if (p && !p._tasksLoaded) {
-          await hydrateTasksForProject(p.id);
-        } else {
-          render();
-        }
+        if (p && !p._tasksLoaded) await hydrateTasksForProject(p.id); else render();
       }
 
       // Lists & Items
@@ -1292,68 +1099,33 @@
       }
 
       // Open Create Project modal
-      if (target.id === "addNewProjectBtn") {
-        state.isProjectModalOpen = true;
-        render();
-      }
+      if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
 
-      if (target.id === "addNewTodoItemBtn") {
-        state.isTodoModalOpen = true;
-        state.activeTodoItem = null;
-        render();
-      }
-      if (target.id === "addTaskBtn") {
-        state.isTaskModalOpen = true;
-        state.activeTask = null;
-        render();
-      }
+      if (target.id === "addNewTodoItemBtn") { state.isTodoModalOpen = true; state.activeTodoItem = null; render(); }
+      if (target.id === "addTaskBtn") { state.isTaskModalOpen = true; state.activeTask = null; render(); }
       if (target.closest(".move-to-project-btn")) {
-        state.itemToMove = parseInt(
-          target.closest("[data-item-id]").dataset.itemId
-        );
-        state.isMoveToProjectModalOpen = true;
-        render();
+        state.itemToMove = parseInt(target.closest("[data-item-id]").dataset.itemId);
+        state.isMoveToProjectModalOpen = true; render();
       }
       if (target.id === "confirmMoveBtn") {
-        const targetProjectId = parseInt(
-          document.getElementById("projectSelectDropdown").value
-        );
+        const targetProjectId = parseInt(document.getElementById("projectSelectDropdown").value);
         const project = state.projects.find((p) => p.id === targetProjectId);
-        const activeList = state.todoLists.find(
-          (l) => l.id === state.activeTodoListId
-        );
-        const itemIndex = activeList.items.findIndex(
-          (i) => i.id === state.itemToMove
-        );
+        const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
+        const itemIndex = activeList.items.findIndex((i) => i.id === state.itemToMove);
         if (project && itemIndex > -1) {
           const [item] = activeList.items.splice(itemIndex, 1);
-          project.columns[0].tasks.push({
-            id: Date.now(),
-            content: item.content,
-            notes: item.description,
-            ...item,
-          });
+          project.columns[0].tasks.push({ id: Date.now(), content: item.content, notes: item.description, ...item });
         }
-        state.isMoveToProjectModalOpen = false;
-        render();
+        state.isMoveToProjectModalOpen = false; render();
       }
 
       if (target.closest(".close-modal-btn")) {
-        state.isTaskModalOpen = false;
-        state.isTodoModalOpen = false;
-        state.isMoveToProjectModalOpen = false;
-        state.isInfoModalOpen = false;
-        state.isMilestoneModalOpen = false;
-        state.isProfileModalOpen = false;
-        state.isAiModalOpen = false;
-        state.isProjectModalOpen = false; // NEW
-        render();
+        state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
+        state.isInfoModalOpen = false; state.isMilestoneModalOpen = false; state.isProfileModalOpen = false;
+        state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
       }
 
-      if (target.id === "aiAnalyzeBtn") {
-        state.isAiModalOpen = true;
-        render();
-      }
+      if (target.id === "aiAnalyzeBtn") { state.isAiModalOpen = true; render(); }
 
       const taskContent = target.closest(".task-content");
       if (taskContent) {
@@ -1361,85 +1133,44 @@
         const project = state.projects.find((p) => p.id === state.activeProjectId);
         for (const col of project.columns) {
           const task = col.tasks.find((t) => t.id === taskId);
-          if (task) {
-            state.activeTask = task;
-            state.isTaskModalOpen = true;
-            render();
-            break;
-          }
+          if (task) { state.activeTask = task; state.isTaskModalOpen = true; render(); break; }
         }
       }
 
       const infoBtn = target.closest(".info-btn");
       if (infoBtn) {
         const key = infoBtn.dataset.info;
-        if (key === "milestones")
-          state.infoModalContent = {
-            title: "Milestone Planning Tips",
-            body: "<p>Good milestones are S.M.A.R.T: Specific, Measurable, Achievable, Relevant, and Time-bound. They represent major achievements in your project, not small tasks.</p>",
-          };
-        if (key === "taskTracking")
-          state.infoModalContent = {
-            title: "Task Tracking Matrix",
-            body: "<p>Upload a CSV to see it as a grid. You can write in any cell to update it, or right-click a cell to set a color-coded status.</p>",
-          };
-        if (key === "aiComm")
-          state.infoModalContent = {
-            title: "AI Automated Communication",
-            body: "<p>When activated, the AI will automatically message the assigned developer based on your schedule to ask for updates using your custom prompt.</p>",
-          };
-        state.isInfoModalOpen = true;
-        render();
+        if (key === "milestones") state.infoModalContent = { title: "Milestone Planning Tips", body: "<p>Good milestones are S.M.A.R.T: Specific, Measurable, Achievable, Relevant, and Time-bound. They represent major achievements in your project, not small tasks.</p>" };
+        if (key === "taskTracking") state.infoModalContent = { title: "Task Tracking Matrix", body: "<p>Upload a CSV to see it as a grid. You can write in any cell to update it, or right-click a cell to set a color-coded status.</p>" };
+        if (key === "aiComm") state.infoModalContent = { title: "AI Automated Communication", body: "<p>When activated, the AI will automatically message the assigned developer based on your schedule to ask for updates using your custom prompt.</p>" };
+        state.isInfoModalOpen = true; render();
       }
 
       const viewProfileBtn = target.closest(".view-profile-btn");
       if (viewProfileBtn) {
-        state.activeProfile = state.users.find(
-          (u) => u.id === parseInt(viewProfileBtn.dataset.userId)
-        );
+        state.activeProfile = state.users.find((u) => u.id === parseInt(viewProfileBtn.dataset.userId));
         render();
       }
-      if (target.id === "backToProfilesBtn") {
-        state.activeProfile = null;
-        render();
-      }
-      if (target.id === "addNewProfileBtn") {
-        state.isProfileModalOpen = true;
-        state.activeProfile = null;
-        render();
-      }
+      if (target.id === "backToProfilesBtn") { state.activeProfile = null; render(); }
+      if (target.id === "addNewProfileBtn") { state.isProfileModalOpen = true; state.activeProfile = null; render(); }
 
       const milestoneProjectCard = target.closest(".milestone-project-card");
-      if (milestoneProjectCard) {
-        state.activeMilestoneProjectId = parseInt(
-          milestoneProjectCard.dataset.projectId
-        );
-        render();
-      }
-      if (target.id === "backToProjectsBtn") {
-        state.activeMilestoneProjectId = null;
-        render();
-      }
+      if (milestoneProjectCard) { state.activeMilestoneProjectId = parseInt(milestoneProjectCard.dataset.projectId); render(); }
+      if (target.id === "backToProjectsBtn") { state.activeMilestoneProjectId = null; render(); }
 
-      if (target.id === "addMilestoneBtn") {
-        state.isMilestoneModalOpen = true;
-        state.activeMilestone = null;
-        render();
-      }
+      if (target.id === "addMilestoneBtn") { state.isMilestoneModalOpen = true; state.activeMilestone = null; render(); }
 
       // Dashboard mode switcher
       const modeBtn = target.closest(".dashboard-mode-btn");
-      if (modeBtn) {
-        state.dashboardMode = modeBtn.dataset.mode;
-        render();
-      }
-      if (target.id === "prevMonthBtn") {
-        state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
-        render();
-      }
-      if (target.id === "nextMonthBtn") {
-        state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
-        render();
+      if (modeBtn) { state.dashboardMode = modeBtn.dataset.mode; render(); }
+      if (target.id === "prevMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() - 1); render(); }
+      if (target.id === "nextMonthBtn") { state.calendarDate.setMonth(state.calendarDate.getMonth() + 1); render(); }
+
+      // NEW: Resume "View" button
+      const resumeBtn = target.closest(".view-resume-btn");
+      if (resumeBtn) {
+        const url = resumeBtn.dataset.resume;
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
       }
     });
 
@@ -1454,7 +1185,7 @@
     });
 
     document.body.addEventListener("submit", async (e) => {
-      // Save Task -> CREATE via API then refresh column data
+      // Save Task
       if (e.target.id === "taskForm") {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -1482,20 +1213,18 @@
             projectId: project.id,
             title: taskData.content,
             description: taskData.notes || null,
-            assigneeId: null, // map to real user id later
+            assigneeId: null,
             status: uiToApiStatus["Backlog"],
             priority: uiToApiPriority[taskData.priority || "Medium"],
             dueDate: taskData.dueDate || null,
           };
           await apiFetch("/api/tasks", { method: "POST", body: payload });
-
           await hydrateTasksForProject(project.id);
           state.isTaskModalOpen = false;
         } catch (err) {
           const msg =
             err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors &&
-              Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
             err?.data?.error ||
             "Failed to create task";
           alert(msg);
@@ -1509,15 +1238,8 @@
         const data = Object.fromEntries(formData.entries());
         const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
         if (state.activeTodoItem) Object.assign(state.activeTodoItem, data);
-        else
-          activeList.items.push({
-            id: Date.now(),
-            ...data,
-            subtasks: [],
-            createdAt: Date.now(),
-          });
-        state.isTodoModalOpen = false;
-        render();
+        else activeList.items.push({ id: Date.now(), ...data, subtasks: [], createdAt: Date.now() });
+        state.isTodoModalOpen = false; render();
       }
 
       // Save Milestone
@@ -1525,15 +1247,12 @@
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        const project = state.projects.find(
-          (p) => p.id === state.activeMilestoneProjectId
-        );
+        const project = state.projects.find((p) => p.id === state.activeMilestoneProjectId);
         if (project) project.milestones.push({ id: Date.now(), ...data });
-        state.isMilestoneModalOpen = false;
-        render();
+        state.isMilestoneModalOpen = false; render();
       }
 
-      // Create Project (API)
+      // Create Project
       if (e.target.id === "projectForm") {
         e.preventDefault();
         const fd = new FormData(e.target);
@@ -1541,19 +1260,8 @@
         const description = (fd.get("description") || "").toString().trim() || null;
 
         try {
-          const created = await apiFetch("/api/projects", {
-            method: "POST",
-            body: { name, description },
-          });
-
-          const newProj = {
-            id: created.id,
-            name: created.name,
-            description: created.description ?? "",
-            columns: defaultColumns(),
-            milestones: [],
-            _tasksLoaded: false,
-          };
+          const created = await apiFetch("/api/projects", { method: "POST", body: { name, description } });
+          const newProj = { id: created.id, name: created.name, description: created.description ?? "", columns: defaultColumns(), milestones: [], _tasksLoaded: false };
           state.projects.unshift(newProj);
           state.activeProjectId = created.id;
           state.currentView = "dashboardView";
@@ -1562,8 +1270,7 @@
         } catch (err) {
           const msg =
             err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors &&
-              Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
             err?.data?.error ||
             "Failed to create project";
           alert(msg);
@@ -1573,22 +1280,17 @@
       // UPDATED: Save Profile (with optional resume upload)
       if (e.target.id === "profileForm") {
         e.preventDefault();
-
         const formEl = e.target;
         const fd = new FormData(formEl);
 
         // Normalize languages to JSON array string for backend
-        const langs = (fd.get("languages") || "")
-          .toString()
-          .split(",")
-          .map(s => s.trim())
-          .filter(Boolean);
+        const langs = (fd.get("languages") || "").toString().split(",").map((s) => s.trim()).filter(Boolean);
         fd.set("languages", JSON.stringify(langs));
 
         try {
           const created = await apiUpload("/api/profiles", fd);
 
-          // Update local UI list
+          // Update local UI list quickly
           state.users.push({
             id: created.id,
             name: created.full_name,
@@ -1609,14 +1311,14 @@
         } catch (err) {
           const msg =
             err?.data?.error?.formErrors?.join?.(", ") ||
-            (err?.data?.error?.fieldErrors &&
-              Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
+            (err?.data?.error?.fieldErrors && Object.values(err.data.error.fieldErrors).flat().join(", ")) ||
             err?.data?.error ||
             "Failed to save profile";
           alert(msg);
         }
       }
     });
+
   });
 </script>
 

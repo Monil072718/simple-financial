@@ -1,6 +1,5 @@
 import { query } from "@/lib/db";
 
-/** Row shape in DB */
 export type ProfileRow = {
   id: number;
   user_id: number | null;
@@ -40,11 +39,6 @@ export type CreateProfileInput = {
 
 export type UpdateProfileInput = Partial<CreateProfileInput>;
 
-/**
- * listProfiles – supports two call styles:
- *  - listProfiles({ q?, page?, limit? })
- *  - listProfiles(page?: number, limit?: number)  // backward-compat
- */
 export function listProfiles(page?: number, limit?: number): Promise<ProfileRow[]>;
 export function listProfiles(params?: ListParams): Promise<ProfileRow[]>;
 export async function listProfiles(a?: number | ListParams, b?: number): Promise<ProfileRow[]> {
@@ -62,12 +56,10 @@ export async function listProfiles(a?: number | ListParams, b?: number): Promise
   }
 
   const offset = (page - 1) * limit;
-
   const params: any[] = [];
   let where = "";
 
   if (q) {
-    // push q three times for the three ILIKEs
     params.push(`%${q}%`); const p1 = params.length;
     params.push(`%${q}%`); const p2 = params.length;
     params.push(`%${q}%`); const p3 = params.length;
@@ -78,7 +70,6 @@ export async function listProfiles(a?: number | ListParams, b?: number): Promise
     `;
   }
 
-  // Use parameterized limit/offset to be tidy
   params.push(limit); const pLimit = params.length;
   params.push(offset); const pOffset = params.length;
 
@@ -97,10 +88,7 @@ export async function listProfiles(a?: number | ListParams, b?: number): Promise
 
 export async function getProfile(id: number) {
   const { rows } = await query<ProfileRow>(
-    `SELECT id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
-            languages, admin_feedback, resume_url, created_at, updated_at
-       FROM profiles
-      WHERE id = $1`,
+    `SELECT * FROM profiles WHERE id = $1`,
     [id]
   );
   return rows[0] ?? null;
@@ -112,8 +100,7 @@ export async function createProfile(data: CreateProfileInput) {
       (user_id, full_name, title, description, email, phone, linkedin_url, github_url,
        languages, admin_feedback, resume_url)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     RETURNING id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
-               languages, admin_feedback, resume_url, created_at, updated_at`,
+     RETURNING *`,
     [
       data.userId ?? null,
       data.fullName,
@@ -147,8 +134,7 @@ export async function updateProfile(id: number, data: UpdateProfileInput) {
         resume_url     = COALESCE($11, resume_url),
         updated_at     = NOW()
       WHERE id = $12
-      RETURNING id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
-                languages, admin_feedback, resume_url, created_at, updated_at`,
+      RETURNING *`,
     [
       data.userId ?? null,
       data.fullName ?? null,
