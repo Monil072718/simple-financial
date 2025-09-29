@@ -1300,9 +1300,11 @@
 
         const viewProfileBtn = target.closest(".view-profile-btn");
         if (viewProfileBtn) {
-          state.activeProfile = state.users.find((u) => u.id === parseInt(viewProfileBtn.dataset.userId));
+          const uid = viewProfileBtn.dataset.userId; // keep as string
+          state.activeProfile = state.users.find((u) => String(u.id) === String(uid));
           render();
         }
+
         if (target.id === "backToProfilesBtn") { state.activeProfile = null; render(); }
         if (target.id === "addNewProfileBtn") { state.isProfileModalOpen = true; state.activeProfile = null; render(); }
 
