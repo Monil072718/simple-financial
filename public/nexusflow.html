@@ -588,7 +588,11 @@
           document.getElementById("currentUserDisplay").innerHTML =
             `<p class="font-semibold text-sm">${state.currentUser.name}</p>
            <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-          document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+
+          // ALWAYS SHOW the Communication nav link
+          const comm = document.getElementById("commNavLink");
+          if (comm) comm.style.display = "flex";
+
           showApp();
           await hydrateProjects();
           await hydrateProfiles();
@@ -612,7 +616,11 @@
           document.getElementById("currentUserDisplay").innerHTML =
             `<p class="font-semibold text-sm">${state.currentUser.name}</p>
            <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-          document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+
+          // ALWAYS SHOW the Communication nav link
+          const comm = document.getElementById("commNavLink");
+          if (comm) comm.style.display = "flex";
+
           showApp();
           await hydrateProjects();
           await hydrateProfiles();
@@ -633,7 +641,11 @@
         document.getElementById("currentUserDisplay").innerHTML =
           `<p class="font-semibold text-sm">${state.currentUser.name}</p>
          <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        document.getElementById("commNavLink").style.display = state.currentUser.role === "admin" ? "flex" : "none";
+
+        // ALWAYS SHOW the Communication nav link
+        const comm = document.getElementById("commNavLink");
+        if (comm) comm.style.display = "flex";
+
         showApp();
         hydrateProjects();
         hydrateProfiles();
@@ -847,12 +859,12 @@
         container.innerHTML = table;
       }
 
-      // FIXED: Added missing renderCommunicationView function
+      // UPDATED: Communication view now visible to ALL users (removed role gate)
       function renderCommunicationView() {
-        if (state.currentUser.role !== "admin") {
-          return `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
-        }
-        const activeComms = state.projects.flatMap(p => p.columns.flatMap(c => c.tasks)).filter(t => t.aiComm && t.aiComm.active);
+        const activeComms = state.projects
+          .flatMap(p => p.columns.flatMap(c => c.tasks))
+          .filter(t => t.aiComm && t.aiComm.active);
+
         return `<div class="p-6">
           <h2 class="text-2xl font-bold mb-6">Active AI Communications</h2>
           <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8">
