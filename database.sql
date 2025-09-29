@@ -1,4 +1,4 @@
--- 0) Case-insensitive email support
+-- 0) Case-insensitive email support (PostgreSQL)
 CREATE EXTENSION IF NOT EXISTS citext;
 
 -- 1) USERS (fresh create path)
@@ -130,10 +130,10 @@ CREATE TRIGGER trg_tasks_set_updated_at
 BEFORE UPDATE ON public.tasks
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Developer profiles (one per person; may or may not map to an auth user)
+-- 8) Developer profiles
 CREATE TABLE IF NOT EXISTS profiles (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NULL,
+  user_id INTEGER NULL REFERENCES public.users(id) ON DELETE SET NULL,
   full_name TEXT NOT NULL,
   title TEXT NULL,
   description TEXT NULL,
@@ -144,46 +144,70 @@ CREATE TABLE IF NOT EXISTS profiles (
   languages TEXT[] DEFAULT '{}',
   admin_feedback TEXT NULL,
   resume_url TEXT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-
 CREATE INDEX IF NOT EXISTS idx_profiles_fullname ON profiles (full_name);
-CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
+CREATE INDEX IF NOT EXISTS idx_profiles_email    ON profiles (email);
 
--- To-Do Lists (idempotent creates)
+-- 9) To-Do Lists (PostgreSQL versions)
+-- Users for the todo module (kept as TEXT primary key)
 CREATE TABLE IF NOT EXISTS todo_users (
   id TEXT PRIMARY KEY,                -- matches your auth user id / email / uuid
   email TEXT,
   name TEXT
 );
 
+-- Lists
 CREATE TABLE IF NOT EXISTS todo_lists (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ownerId TEXT NOT NULL,
-  name TEXT NOT NULL,
-  createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL,
-  FOREIGN KEY (ownerId) REFERENCES todo_users(id)
+  id           BIGSERIAL PRIMARY KEY,
+  owner_id     TEXT NOT NULL REFERENCES todo_users(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Items
 CREATE TABLE IF NOT EXISTS todo_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  listId INTEGER NOT NULL,
-  ownerId TEXT NOT NULL,              -- denormalized for quick filtering
-  content TEXT NOT NULL,
-  description TEXT,
-  link TEXT,
+  id            BIGSERIAL PRIMARY KEY,
+  list_id       BIGINT NOT NULL REFERENCES todo_lists(id) ON DELETE CASCADE,
+  owner_id      TEXT   NOT NULL REFERENCES todo_users(id) ON DELETE CASCADE, -- denormalized for quick filtering
+  content       TEXT   NOT NULL,
+  description   TEXT,
+  link          TEXT,
   considerations TEXT,
-  priority TEXT CHECK(priority IN ('Low','Medium','High')) DEFAULT 'Medium',
-  dueDate TEXT,                       -- ISO date string
-  assigneeId TEXT,                    -- optional user id
-  tags TEXT DEFAULT '[]',             -- JSON array of strings
-  status TEXT CHECK(status IN ('open','done','archived')) DEFAULT 'open',
-  position INTEGER DEFAULT 0,         -- for manual ordering
-  projectId INTEGER,                  -- if "moved to project" (optional)
-  createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL,
-  FOREIGN KEY (listId) REFERENCES todo_lists(id)
+  priority      TEXT CHECK(priority IN ('Low','Medium','High')) DEFAULT 'Medium',
+  due_date      DATE,                         -- use proper date
+  assignee_id   TEXT,                         -- optional user id (free text or FK to todo_users if you prefer)
+  tags          JSONB NOT NULL DEFAULT '[]'::jsonb,   -- array of strings
+  status        TEXT CHECK(status IN ('open','done','archived')) DEFAULT 'open',
+  position      INTEGER DEFAULT 0,            -- for manual ordering
+  project_id    INTEGER,                      -- optional link out
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Indexes for todo tables
+CREATE INDEX IF NOT EXISTS idx_todo_lists_owner   ON todo_lists(owner_id);
+CREATE INDEX IF NOT EXISTS idx_todo_items_list    ON todo_items(list_id);
+CREATE INDEX IF NOT EXISTS idx_todo_items_owner   ON todo_items(owner_id);
+CREATE INDEX IF NOT EXISTS idx_todo_items_status  ON todo_items(status);
+CREATE INDEX IF NOT EXISTS idx_todo_items_priority ON todo_items(priority);
+
+-- Triggers to auto-update updated_at on profiles/todo tables
+DROP TRIGGER IF EXISTS trg_profiles_set_updated_at  ON profiles;
+DROP TRIGGER IF EXISTS trg_todo_lists_set_updated_at ON todo_lists;
+DROP TRIGGER IF EXISTS trg_todo_items_set_updated_at ON todo_items;
+
+CREATE TRIGGER trg_profiles_set_updated_at
+BEFORE UPDATE ON profiles
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE TRIGGER trg_todo_lists_set_updated_at
+BEFORE UPDATE ON todo_lists
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE TRIGGER trg_todo_items_set_updated_at
+BEFORE UPDATE ON todo_items
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
