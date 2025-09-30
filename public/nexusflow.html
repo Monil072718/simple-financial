@@ -109,6 +109,22 @@
     .calendar-day {
       min-height: 120px;
     }
+
+    /* Drag and drop styles */
+    .task-card.dragging {
+      opacity: 0.5;
+      transform: rotate(5deg);
+    }
+
+    .column.drop-zone {
+      background-color: #374151;
+      border: 2px dashed #4b5563;
+    }
+
+    .column.drop-zone.drag-over {
+      background-color: #4b5563;
+      border-color: #60a5fa;
+    }
   </style>
 </head>
 
@@ -791,12 +807,12 @@
           }
           case "todoView": viewTitle.textContent = "To-Do Lists"; content = renderTodoView(); break;
           case "taskTrackingView": viewTitle.textContent = "Task Tracking Matrix"; content = renderTaskTrackingView(); break;
-          case "communicationView": 
+          case "communicationView":
             if (state.currentUser.role !== 'admin') {
               content = `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
             } else {
-              viewTitle.textContent = "Communication"; 
-              content = renderCommunicationView(); 
+              viewTitle.textContent = "Communication";
+              content = renderCommunicationView();
             }
             break;
           case "profileView": viewTitle.textContent = "Developer Profiles"; content = renderProfileView(); break;
@@ -809,8 +825,12 @@
           if (!project) return;
           if (state.dashboardMode === "table") renderTableView(project);
           if (state.dashboardMode === "calendar") renderCalendarView(project);
+          if (state.dashboardMode === "board") setupDragAndDrop();
         }
-        if (state.currentView === "taskTrackingView") renderCsvAsGrid(state.gridData);
+        if (state.currentView === "taskTrackingView") {
+          renderCsvAsGrid(state.gridData);
+          setupExportButtons();
+        }
       }
 
       function renderDashboard(project) {
@@ -837,14 +857,14 @@
       }
       function createColumnHTML(col) {
         const tasks = col.tasks || [];
-        return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full" data-column-id="${col.id}">
+        return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full column drop-zone" data-column-id="${col.id}">
           <h3 class="font-bold text-lg text-cyan-300 mb-4">${col.title} (${tasks.length})</h3>
           <div class="tasks-container flex-grow space-y-4">${tasks.map((t) => createTaskCardHTML(t)).join("")}</div>
         </div>`;
       }
       function createTaskCardHTML(task) {
         const assignee = state.users.find((u) => u.name === task.assignee);
-        return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative">
+        return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative task-card" draggable="true" data-task-id="${task.id}">
           <input type="checkbox" class="task-checkbox absolute top-2 right-2 h-5 w-5 bg-gray-600 border-gray-500 rounded text-indigo-500" data-task-id="${task.id}">
           <div class="cursor-pointer task-content" data-task-id="${task.id}">
             <p class="font-medium pr-8">${task.content}</p>
@@ -1379,6 +1399,179 @@
         </div>`;
       }
 
+      // ---------- Drag and Drop Functionality ----------
+      function setupDragAndDrop() {
+        const taskCards = document.querySelectorAll('.task-card');
+        const columns = document.querySelectorAll('.column');
+
+        taskCards.forEach(task => {
+          task.addEventListener('dragstart', handleDragStart);
+          task.addEventListener('dragend', handleDragEnd);
+        });
+
+        columns.forEach(column => {
+          column.addEventListener('dragover', handleDragOver);
+          column.addEventListener('dragenter', handleDragEnter);
+          column.addEventListener('dragleave', handleDragLeave);
+          column.addEventListener('drop', handleDrop);
+        });
+      }
+
+      function handleDragStart(e) {
+        e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+        e.target.classList.add('dragging');
+        setTimeout(() => {
+          e.target.style.display = 'none';
+        }, 0);
+      }
+
+      function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+        e.target.style.display = 'block';
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+      }
+
+      function handleDragEnter(e) {
+        e.preventDefault();
+        e.target.closest('.column').classList.add('drag-over');
+      }
+
+      function handleDragLeave(e) {
+        e.target.closest('.column').classList.remove('drag-over');
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        const column = e.target.closest('.column');
+        column.classList.remove('drag-over');
+
+        const taskId = parseInt(e.dataTransfer.getData('text/plain'));
+        const sourceColumn = document.querySelector('.task-card.dragging').closest('.column');
+        const targetColumnId = parseInt(column.dataset.columnId);
+
+        if (sourceColumn && column && sourceColumn !== column) {
+          moveTaskToColumn(taskId, parseInt(sourceColumn.dataset.columnId), targetColumnId);
+        }
+      }
+
+      function moveTaskToColumn(taskId, sourceColumnId, targetColumnId) {
+        const project = state.projects.find(p => p.id === state.activeProjectId);
+        if (!project) return;
+
+        const sourceColumn = project.columns.find(c => c.id === sourceColumnId);
+        const targetColumn = project.columns.find(c => c.id === targetColumnId);
+
+        if (!sourceColumn || !targetColumn) return;
+
+        const taskIndex = sourceColumn.tasks.findIndex(t => t.id === taskId);
+        if (taskIndex === -1) return;
+
+        const [task] = sourceColumn.tasks.splice(taskIndex, 1);
+        targetColumn.tasks.push(task);
+
+        render();
+      }
+
+      // ---------- Export Functionality ----------
+      function setupExportButtons() {
+        const exportCsvBtn = document.getElementById('exportMatrixCsvBtn');
+        const exportPdfBtn = document.getElementById('exportMatrixPdfBtn');
+        const importCsvInput = document.getElementById('importMatrixCsvInput');
+
+        if (exportCsvBtn) {
+          exportCsvBtn.addEventListener('click', exportMatrixAsCsv);
+        }
+        if (exportPdfBtn) {
+          exportPdfBtn.addEventListener('click', exportMatrixAsPdf);
+        }
+        if (importCsvInput) {
+          importCsvInput.addEventListener('change', handleCsvImport);
+        }
+      }
+
+      function exportMatrixAsCsv() {
+        if (!state.gridData || state.gridData.length === 0) {
+          alert('No data to export');
+          return;
+        }
+
+        const csvContent = state.gridData.map(row => {
+          return row.map(cell => {
+            if (typeof cell === 'object') {
+              return `"${cell.text || ''}"`;
+            }
+            return `"${cell}"`;
+          }).join(',');
+        }).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'task_matrix.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+
+      function exportMatrixAsPdf() {
+        if (!jsPDF) {
+          alert('PDF library not loaded');
+          return;
+        }
+
+        const table = document.getElementById('csvGridTable');
+        if (!table) {
+          alert('No table to export');
+          return;
+        }
+
+        html2canvas(table).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const imgWidth = 210;
+          const pageHeight = 295;
+          const imgHeight = canvas.height * imgWidth / canvas.width;
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+
+          while (heightLeft >= 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+
+          pdf.save('task_matrix.pdf');
+        });
+      }
+
+      function handleCsvImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const csvText = e.target.result;
+          const rows = csvText.split('\n').map(row => row.split(',').map(cell => {
+            // Remove quotes and trim
+            const cleaned = cell.replace(/^"|"$/g, '').trim();
+            return { text: cleaned, color: '' };
+          }));
+
+          state.gridData = rows;
+          renderCsvAsGrid(state.gridData);
+        };
+        reader.readAsText(file);
+      }
+
       // ---------- Events ----------
       document.body.addEventListener("click", async (e) => {
         const target = e.target;
@@ -1757,4 +1950,5 @@
     });
   </script>
 </body>
+
 </html>
