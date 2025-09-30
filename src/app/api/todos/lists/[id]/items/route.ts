@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const listId = Number(params.id);
 
   // default values
-  const priority = (body.priority || "Medium") as "Low" | "Medium" | "High";
+  const priority = (body.priority || "Medium") as "Low" | "Medium" | "High" | "Urgent";
   const tags = JSON.stringify(body.tags || []);
   const position =
     typeof body.position === "number"
