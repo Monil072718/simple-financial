@@ -1,5 +1,6 @@
 // src/lib/auth.ts
 import jwt, { JwtPayload } from "jsonwebtoken";
+import { NextRequest } from "next/server";
 
 export type AuthUser = { id: number; email: string };
 
@@ -28,4 +29,9 @@ export function verifyAuth(headerAuth?: string): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+export function getAuthUser(req: NextRequest): AuthUser | null {
+  const headerAuth = req.headers.get("authorization") || undefined;
+  return verifyAuth(headerAuth);
 }
