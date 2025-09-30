@@ -519,6 +519,48 @@
         else render();
       }
 
+
+      // ===== To-Do Lists: load from backend =====
+      async function hydrateTodoLists() {
+        try {
+          const lists = await apiFetch("/api/todos/lists");
+          state.todoLists = (lists || []).map((l) => ({ id: l.id, name: l.name, items: [] }));
+          if (state.todoLists.length) {
+            state.activeTodoListId = state.todoLists[0].id;
+            await loadTodoItems(state.activeTodoListId);
+          }
+          render();
+        } catch (err) {
+          console.warn("Failed to load todo lists:", err);
+          // keep any local sample if present
+          render();
+        }
+      }
+
+      async function loadTodoItems(listId) {
+        try {
+          const rows = await apiFetch(`/api/todos/lists/${listId}/items`);
+          const mapped = rows.map((i) => ({
+            id: i.id,
+            content: i.content,
+            description: i.description || "",
+            links: i.link || "",
+            priority: i.priority || "Medium",
+            dueDate: i.dueDate || "",
+            assignee: i.assigneeId || null,
+            thingsToConsider: i.considerations || "",
+            subtasks: (i.tags || []).map((t) => ({ text: t, done: false })),
+            createdAt: Date.parse(i.createdAt || "") || Date.now(),
+          }));
+          const list = state.todoLists.find((l) => l.id === listId);
+          if (list) list.items = mapped;
+          render();
+        } catch (err) {
+          console.warn("Failed to load list items:", err);
+        }
+      }
+
+
       // ===== Hydrate Profiles from API =====
       async function hydrateProfiles() {
         try {
@@ -1230,6 +1272,14 @@
         const navLink = target.closest(".nav-link");
         const projectLink = target.closest(".project-link");
 
+        const listLink = target.closest("#todoListsContainer a");
+        if (listLink) {
+          const listId = parseInt(listLink.dataset.listId);
+          state.activeTodoListId = listId;
+          await loadTodoItems(listId);
+          return;
+        }
+
         if (navLink) {
           state.currentView = navLink.dataset.view;
           if (navLink.dataset.view === "milestonesView") state.activeMilestoneProjectId = null;
@@ -1246,14 +1296,48 @@
         // Lists & Items
         if (target.id === "addNewListBtn") {
           const name = prompt("New list name:");
-          if (name) state.todoLists.push({ id: Date.now(), name, items: [] });
-          render();
+          if (!name) return;
+          try {
+            const created = await apiFetch("/api/todos/lists", { method: "POST", body: { name } });
+            state.todoLists.push({ id: created.id, name: created.name, items: [] });
+            state.activeTodoListId = created.id;
+            render();
+          } catch (err) {
+            alert(err?.data?.error || "Failed to create list");
+          }
         }
+
 
         // Open Create Project modal
         if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
 
-        if (target.id === "addNewTodoItemBtn") { state.isTodoModalOpen = true; state.activeTodoItem = null; render(); }
+        // Save Todo (POST /api/todos/lists/:listId/items)
+        if (e.target.id === "todoForm") {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          const listId = state.activeTodoListId;
+
+          const payload = {
+            content: data.content,
+            description: data.description || null,
+            link: data.links || null,
+            considerations: data.thingsToConsider || null,
+            priority: (data.priority || "Medium"),
+            dueDate: data.dueDate || null,
+            assigneeId: data.assignee || null,
+            tags: [], // (could map subtasks → tags later if you add subtask inputs)
+          };
+
+          try {
+            await apiFetch(`/api/todos/lists/${listId}/items`, { method: "POST", body: payload });
+            state.isTodoModalOpen = false;
+            await loadTodoItems(listId); // refresh
+          } catch (err) {
+            alert(err?.data?.error || "Failed to add item");
+          }
+        }
+
         if (target.id === "addTaskBtn") { state.isTaskModalOpen = true; state.activeTask = null; render(); }
         if (target.closest(".move-to-project-btn")) {
           state.itemToMove = parseInt(target.closest("[data-item-id]").dataset.itemId);
@@ -1261,15 +1345,25 @@
         }
         if (target.id === "confirmMoveBtn") {
           const targetProjectId = parseInt(document.getElementById("projectSelectDropdown").value);
-          const project = state.projects.find((p) => p.id === targetProjectId);
           const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
           const itemIndex = activeList.items.findIndex((i) => i.id === state.itemToMove);
-          if (project && itemIndex > -1) {
-            const [item] = activeList.items.splice(itemIndex, 1);
-            project.columns[0].tasks.push({ id: Date.now(), content: item.content, notes: item.description, ...item });
+          if (itemIndex === -1) return;
+
+          const itemId = activeList.items[itemIndex].id;
+          try {
+            await apiFetch(`/api/todos/items/${itemId}/move`, {
+              method: "POST",
+              body: { projectId: targetProjectId }
+            });
+            // Optimistic UI: remove from list and refresh from backend
+            activeList.items.splice(itemIndex, 1);
+            state.isMoveToProjectModalOpen = false;
+            await loadTodoItems(state.activeTodoListId);
+          } catch (err) {
+            alert(err?.data?.error || "Failed to move item");
           }
-          state.isMoveToProjectModalOpen = false; render();
         }
+
 
         if (target.closest(".close-modal-btn")) {
           state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
