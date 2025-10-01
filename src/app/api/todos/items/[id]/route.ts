@@ -17,11 +17,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     "dueDate","assigneeId","tags","status","position","projectId","listId"
   ];
 
+  const allowedPriorities = new Set(["Low","Medium","High","Urgent"]);
   for (const k of allow) {
     if (k in body) {
       if (k === "tags" && Array.isArray(body[k])) {
         fields.push(`tags = ?`);
         values.push(JSON.stringify(body[k]));
+      } else if (k === "priority") {
+        const val = String(body[k]);
+        fields.push(`priority = ?`);
+        values.push(allowedPriorities.has(val) ? val : "Medium");
       } else {
         fields.push(`${k} = ?`);
         values.push(body[k]);
