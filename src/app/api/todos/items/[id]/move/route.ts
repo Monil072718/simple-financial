@@ -5,10 +5,9 @@ import { getUserId } from "@/lib/getUser";
 // POST /api/todos/items/:id/move  { listId?, projectId? }
 export async function POST(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> } // ← await params in Next 15+
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await ctx.params;         // ← important in Next 15
-  const itemId = Number(id);
+  const itemId = Number(params.id);
   if (!itemId) {
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });
   }
@@ -36,6 +35,13 @@ export async function POST(
   const ts = nowISO();
 
   if (listId) {
+    // Verify target list belongs to same user
+    const target = d
+      .prepare("SELECT id FROM todo_lists WHERE id = ? AND ownerId = ?")
+      .get(Number(listId), ownerId);
+    if (!target) {
+      return NextResponse.json({ error: "Target list not found" }, { status: 404 });
+    }
     // put it at the end of the target list
     const pos = (
       d

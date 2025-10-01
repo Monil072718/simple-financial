@@ -35,8 +35,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const ts = nowISO();
   const listId = Number(params.id);
 
-  // default values
-  const priority = (body.priority || "Medium") as "Low" | "Medium" | "High" | "Urgent";
+  // default values and validation
+  const allowedPriorities = new Set(["Low", "Medium", "High", "Urgent"]);
+  const priority = (body.priority && allowedPriorities.has(body.priority) ? body.priority : "Medium") as
+    | "Low"
+    | "Medium"
+    | "High"
+    | "Urgent";
   const tags = JSON.stringify(body.tags || []);
   const position =
     typeof body.position === "number"
