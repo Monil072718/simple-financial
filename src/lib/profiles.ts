@@ -13,6 +13,9 @@ export type ProfileRow = {
   languages: string[];
   admin_feedback: string | null;
   resume_url: string | null;
+  telegram_chat_id: number | null;
+  telegram_username: string | null;
+  telegram_opt_in: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,9 +42,15 @@ export type CreateProfileInput = {
 
 export type UpdateProfileInput = Partial<CreateProfileInput>;
 
-export function listProfiles(page?: number, limit?: number): Promise<ProfileRow[]>;
+export function listProfiles(
+  page?: number,
+  limit?: number
+): Promise<ProfileRow[]>;
 export function listProfiles(params?: ListParams): Promise<ProfileRow[]>;
-export async function listProfiles(a?: number | ListParams, b?: number): Promise<ProfileRow[]> {
+export async function listProfiles(
+  a?: number | ListParams,
+  b?: number
+): Promise<ProfileRow[]> {
   let q: string | undefined;
   let page = 1;
   let limit = 20;
@@ -60,9 +69,12 @@ export async function listProfiles(a?: number | ListParams, b?: number): Promise
   let where = "";
 
   if (q) {
-    params.push(`%${q}%`); const p1 = params.length;
-    params.push(`%${q}%`); const p2 = params.length;
-    params.push(`%${q}%`); const p3 = params.length;
+    params.push(`%${q}%`);
+    const p1 = params.length;
+    params.push(`%${q}%`);
+    const p2 = params.length;
+    params.push(`%${q}%`);
+    const p3 = params.length;
     where = `
       WHERE full_name ILIKE $${p1}
          OR COALESCE(title,'') ILIKE $${p2}
@@ -70,8 +82,10 @@ export async function listProfiles(a?: number | ListParams, b?: number): Promise
     `;
   }
 
-  params.push(limit); const pLimit = params.length;
-  params.push(offset); const pOffset = params.length;
+  params.push(limit);
+  const pLimit = params.length;
+  params.push(offset);
+  const pOffset = params.length;
 
   const { rows } = await query<ProfileRow>(
     `SELECT id, user_id, full_name, title, description, email, phone, linkedin_url, github_url,
@@ -156,4 +170,65 @@ export async function updateProfile(id: number, data: UpdateProfileInput) {
 export async function deleteProfile(id: number) {
   await query("DELETE FROM profiles WHERE id = $1", [id]);
   return true;
+}
+// src/lib/profiles.ts (or wherever this lives)
+export async function findProfileByPhone(rawPhone: string) {
+  // Keep digits only
+  const onlyDigits = rawPhone.replace(/\D/g, "");
+  // Use last 10 digits for matching (tweak to 8–12 if your domain needs)
+  const last10 = onlyDigits.slice(-10);
+
+  const { rows } = await query<{ id: number; phone: string }>(
+    `
+    SELECT id, phone
+    FROM profiles
+    WHERE RIGHT(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = $1
+    LIMIT 1
+    `,
+    [last10]
+  );
+
+  return rows[0] || null;
+}
+
+export async function linkTelegramToProfile(
+  profileId: number,
+  data: {
+    telegram_chat_id: number;
+    telegram_username: string | null;
+    telegram_opt_in: boolean;
+  }
+) {
+  await query(
+    `UPDATE profiles
+     SET telegram_chat_id = $1,
+         telegram_username = $2,
+         telegram_opt_in = $3,
+         updated_at = NOW()
+     WHERE id = $4`,
+    [
+      data.telegram_chat_id,
+      data.telegram_username,
+      data.telegram_opt_in,
+      profileId,
+    ]
+  );
+  return true;
+}
+export async function getProfileLiteById(profileId: number) {
+  const { rows } = await query<{
+    id: number;
+    full_name: string | null;
+    telegram_chat_id: number | null;
+  }>(
+    `
+    SELECT id, full_name, telegram_chat_id
+    FROM profiles
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [profileId]
+  );
+
+  return rows[0] || null;
 }

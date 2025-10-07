@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, nowISO } from "@/lib/todos.db";
 import { getUserId } from "@/lib/getUser";
+import { createTask } from "@/lib/tasks";
 
-// POST /api/todos/items/:id/move  { listId?, projectId? }
 export async function POST(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> } // ← await params in Next 15+
+  ctx: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await ctx.params;         // ← important in Next 15
+  const { id } = await ctx.params;
   const itemId = Number(id);
-  if (!itemId) {
+  if (!itemId)
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });
-  }
 
   const { listId, projectId } = await req.json().catch(() => ({} as any));
   if (!listId && !projectId) {
@@ -24,19 +23,18 @@ export async function POST(
   const ownerId = getUserId(req);
   const d = db();
 
-  // Make sure the item exists and belongs to this user
+  // 1) Ensure todo exists and belongs to user
   const existing = d
-    .prepare("SELECT id, listId FROM todo_items WHERE id = ? AND ownerId = ?")
-    .get(itemId, ownerId) as { id: number; listId: number } | undefined;
+    .prepare("SELECT * FROM todo_items WHERE id = ? AND ownerId = ?")
+    .get(itemId, ownerId) as any | undefined;
 
-  if (!existing) {
+  if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
 
   const ts = nowISO();
 
+  // 2) If moving to another list (inside todos)
   if (listId) {
-    // put it at the end of the target list
     const pos = (
       d
         .prepare(
@@ -44,16 +42,76 @@ export async function POST(
         )
         .get(Number(listId)) as any
     ).pos;
+
     d.prepare(
       "UPDATE todo_items SET listId = ?, projectId = NULL, position = ?, updatedAt = ? WHERE id = ? AND ownerId = ?"
     ).run(Number(listId), pos, ts, itemId, ownerId);
-  } else {
-    d.prepare(
-      "UPDATE todo_items SET projectId = ?, updatedAt = ? WHERE id = ? AND ownerId = ?"
-    ).run(Number(projectId), ts, itemId, ownerId);
+
+    const row = d
+      .prepare("SELECT * FROM todo_items WHERE id = ?")
+      .get(itemId) as any;
+    row.tags = JSON.parse(row.tags || "[]");
+    return NextResponse.json({ todo: row });
   }
 
-  const row = d.prepare("SELECT * FROM todo_items WHERE id = ?").get(itemId) as any;
-  row.tags = JSON.parse(row.tags || "[]");
-  return NextResponse.json(row);
+  // 3) If moving to a PROJECT backlog -> CREATE a real Postgres task
+  // map priority from SQLite ('Low'|'Medium'|'High') -> tasks ('low'|'medium'|'high')
+  const priorityMap: Record<string, string> = {
+    Low: "low",
+    Medium: "medium",
+    High: "high",
+  };
+
+  // helpers to sanitize values coming from SQLite
+  const numOrNull = (v: any) => {
+    if (v === null || v === undefined) return null;
+    // accept number-like strings only
+    const s = String(v).trim();
+    return /^\d+$/.test(s) ? Number(s) : null;
+  };
+  const strOrNull = (v: any) => {
+    const s = (v ?? "").toString().trim();
+    return s.length ? s : null;
+  };
+
+  const taskPayload = {
+    projectId: Number(projectId), // already validated earlier
+    title: existing.content,
+    description: strOrNull(existing.description),
+    assigneeId: numOrNull(existing.assigneeId), // <- avoid NaN
+    status: "todo",
+    priority: priorityMap[existing.priority || "Medium"] || "medium",
+    dueDate: strOrNull(existing.dueDate), // '' -> null
+  };
+
+  // Check for duplicate task titles in the same project before creating
+  const { query: pgQuery } = await import("@/lib/db");
+  const { rows: existingTasks } = await pgQuery(
+    "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2)",
+    [taskPayload.projectId, taskPayload.title]
+  );
+  
+  if (existingTasks.length > 0) {
+    return NextResponse.json(
+      { error: `A task with the title "${taskPayload.title}" already exists in this project` },
+      { status: 400 }
+    );
+  }
+
+  const createdTask = await createTask(taskPayload);
+
+  // 4) Mark the todo item as archived (or delete it if you prefer)
+  d.prepare(
+    "UPDATE todo_items SET projectId = ?, status = 'archived', updatedAt = ? WHERE id = ? AND ownerId = ?"
+  ).run(Number(projectId), ts, itemId, ownerId);
+
+  const updatedTodo = d
+    .prepare("SELECT * FROM todo_items WHERE id = ?")
+    .get(itemId) as any;
+  updatedTodo.tags = JSON.parse(updatedTodo.tags || "[]");
+
+  return NextResponse.json(
+    { todo: updatedTodo, task: createdTask },
+    { status: 201 }
+  );
 }

@@ -1,9 +1,23 @@
 import { query } from "@/lib/db";
 
-export async function listProjects({ q, page=1, limit=10 }:{ q?:string; page?:number; limit?:number }) {
+export async function listProjects({ q, page=1, limit=10, userId }:{ q?:string; page?:number; limit?:number; userId?:number }) {
   const offset = (page-1)*limit;
   const params:any[] = [];
-  const where = q ? (params.push(`%${q}%`), `WHERE name ILIKE $${params.length}`) : "";
+  const conditions = [];
+  
+  // Filter by user if provided
+  if (userId) {
+    params.push(userId);
+    conditions.push(`owner_id = $${params.length}`);
+  }
+  
+  // Add search condition if provided
+  if (q) {
+    params.push(`%${q}%`);
+    conditions.push(`name ILIKE $${params.length}`);
+  }
+  
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : "";
   const { rows } = await query(
     `SELECT id,name,description,owner_id,status,start_date,due_date,created_at
      FROM projects ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`, params);

@@ -116,6 +116,58 @@
       transform: rotate(5deg);
     }
 
+    /* Task card container constraints */
+    .task-card {
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .task-card .task-content {
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .task-card p {
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }
+
+    .column {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    .tasks-container {
+      max-width: 100%;
+      overflow-x: hidden;
+      /* Hide scrollbar but keep scroll behavior */
+      scrollbar-width: none;
+      /* Firefox */
+      -ms-overflow-style: none;
+      /* Internet Explorer 10+ */
+    }
+
+    .tasks-container::-webkit-scrollbar {
+      display: none;
+      /* WebKit browsers */
+    }
+
+    /* Hide scrollbar for the main kanban board */
+    #kanbanBoardView {
+      scrollbar-width: none;
+      /* Firefox */
+      -ms-overflow-style: none;
+      /* Internet Explorer 10+ */
+    }
+
+    #kanbanBoardView::-webkit-scrollbar {
+      display: none;
+      /* WebKit browsers */
+    }
+
     .column.drop-zone {
       background-color: #374151;
       border: 2px dashed #4b5563;
@@ -349,13 +401,20 @@
     const UI_COLS = ["Backlog", "Pending", "Assigned", "In Progress", "Waiting to Review", "Finished"];
     const uiToApiStatus = {
       Backlog: "todo",
-      Pending: "pending",
-      Assigned: "assigned",
+      Pending: "pending",       // Use distinct status for Pending
+      Assigned: "assigned",     // Use distinct status for Assigned
       "In Progress": "in_progress",
       "Waiting to Review": "review",
       Finished: "done",
     };
-    const apiToUiStatus = Object.fromEntries(Object.entries(uiToApiStatus).map(([k, v]) => [v, k]));
+    const apiToUiStatus = {
+      "todo": "Backlog",
+      "pending": "Pending",
+      "assigned": "Assigned",
+      "in_progress": "In Progress",
+      "review": "Waiting to Review",
+      "done": "Finished"
+    };
     const uiToApiPriority = { Low: "low", Medium: "medium", High: "high", Urgent: "urgent" };
     const apiToUiPriority = { low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };
     function columnTitleToIndex(title) { return UI_COLS.indexOf(title); }
@@ -409,6 +468,7 @@
         isTodoModalOpen: false,
         isInfoModalOpen: false,
         isMoveToProjectModalOpen: false,
+        isMoveTaskModalOpen: false,
         isMilestoneModalOpen: false,
         isProfileModalOpen: false,
         isAiModalOpen: false,
@@ -417,6 +477,7 @@
         infoModalContent: { title: "", body: "" },
         activeMilestone: null, // holds milestone object when editing
         itemToMove: null,
+        taskToMove: null,
         selectedTasksForAI: new Set(),
 
         gridData: [
@@ -497,6 +558,44 @@
           }
         }
         return null;
+      }
+
+      // Build Task Tracking Matrix (Task Name, Assignee, Mon..Fri, Status) from the active project's tasks
+      function syncTaskTrackingFromProject(project) {
+        const header = ["Task Name", "Assignee", "Mon", "Tue", "Wed", "Thu", "Fri", "Status"];
+        const rows = [];
+
+        project.columns.forEach((col) => {
+          (col.tasks || []).forEach((t) => {
+            // Get the actual assignee name - use assigneeId to look up in state.users
+            let assigneeName = t.assignee || "";
+
+            // If we have an assigneeId but no assignee name, try to look it up
+            if (t.assigneeId && !assigneeName) {
+              const user = state.users.find(u => Number(u.id) === Number(t.assigneeId));
+              if (user) {
+                assigneeName = user.name;
+              }
+            }
+
+            rows.push([
+              { text: t.content || t.title || "", color: "" },
+              { text: assigneeName, color: "" }, // Use the properly resolved assignee name
+              { text: "", color: "" },
+              { text: "", color: "" },
+              { text: "", color: "" },
+              { text: "", color: "" },
+              { text: "", color: "" },
+              { text: col.title, color: "" },
+            ]);
+          });
+        });
+
+        state.gridData = [header, ...rows];
+        if (state.currentView === "taskTrackingView") {
+          renderCsvAsGrid(state.gridData);
+          setupExportButtons();
+        }
       }
 
       // ===== Hydrate Projects from API, then their Tasks =====
@@ -586,6 +685,35 @@
             avatar: "...",
             resumeUrl: r.resume_url || null,
           }));
+
+          // Build a quick lookup: id -> display name
+          state.assigneeNameById = {};
+          (state.users || []).forEach((u) => {
+            state.assigneeNameById[u.id] = u.name;
+          });
+
+          // If tasks are already loaded, refresh names on cards & the matrix
+          if (state.activeProjectId) {
+            const p = state.projects.find((x) => x.id === state.activeProjectId);
+            if (p && p._tasksLoaded) {
+              // make sure each task has a display name
+              p.columns.forEach((c) =>
+                (c.tasks || []).forEach((t) => {
+                  if (t.assigneeId != null) {
+                    t.assignee = state.assigneeNameById[t.assigneeId] || "";
+                  }
+                })
+              );
+              // rebuild Task Tracking Matrix and re-render
+              if (typeof syncTaskTrackingFromProject === "function") {
+                syncTaskTrackingFromProject(p);
+              }
+              render();
+              return; // we've already re-rendered
+            }
+          }
+          // END ADD
+
           if (state.currentView === "profileView") render();
         } catch (err) {
           console.warn("Failed to load profiles:", err);
@@ -597,27 +725,51 @@
         const project = state.projects.find((p) => p.id === projectId);
         if (!project) return;
 
+        // reset columns
         project.columns.forEach((c) => (c.tasks = []));
+
         try {
           const tasks = await apiFetch(`/api/tasks?projectId=${projectId}&limit=200`);
+          // Pull communication schedules for these tasks
+          let schedulesByTask = {};
+          try {
+            const comm = await apiFetch(`/api/communications?projectId=${projectId}`);
+            schedulesByTask = Object.fromEntries((comm?.schedules || []).map((s) => [s.task_id, s]));
+          } catch { }
+
           (tasks || []).forEach((t) => {
+            // Find the user by assignee_id to get the proper name
+            let assigneeName = "";
+            if (t.assignee_id) {
+              const user = state.users.find(u => Number(u.id) === Number(t.assignee_id));
+              assigneeName = user ? user.name : "";
+            }
+
+            const sched = schedulesByTask[t.id];
             const uiTask = {
               id: t.id,
               content: t.title,
               notes: t.description || "",
-              assignee: null,
+              assigneeId: t.assignee_id ?? null,
+              assignee: assigneeName, // Set the actual name here
               links: "",
               dueDate: t.due_date || t.dueDate || "",
               priority: apiToUiPriority[t.priority] || "Medium",
-              aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
+              aiComm: { active: !!sched?.active, frequency: sched?.frequency || "daily", days: sched?.days || [], prompt: sched?.prompt || "" },
               subtasks: [],
             };
+
             const colTitle = apiToUiStatus[t.status] || "Backlog";
             const colIdx = columnTitleToIndex(colTitle);
             if (colIdx >= 0) project.columns[colIdx].tasks.push(uiTask);
             else project.columns[0].tasks.push(uiTask);
           });
+
           project._tasksLoaded = true;
+
+          // keep Task Tracking Matrix in sync with the board
+          syncTaskTrackingFromProject(project);
+
           render();
         } catch (e) {
           console.warn("Failed to load tasks:", e);
@@ -696,6 +848,15 @@
         await apiFetch(`/api/milestones/${milestoneId}`, { method: "DELETE" });
       }
 
+      // ---------- Communication Nav Visibility Function ----------
+      function updateCommunicationNavVisibility() {
+        const comm = document.getElementById("commNavLink");
+        if (comm && state.currentUser) {
+          // Show Communication for all authenticated users
+          comm.style.display = 'flex';
+        }
+      }
+
       // ---------- AUTH: LOGIN (API) ----------
       const loginForm = document.getElementById("loginForm");
       loginForm.addEventListener("submit", async (e) => {
@@ -709,8 +870,12 @@
           document.getElementById("currentUserDisplay").innerHTML =
             `<p class="font-semibold text-sm">${state.currentUser.name}</p>
              <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-          const comm = document.getElementById("commNavLink");
-          if (comm) comm.style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+
+          // FIX: Update communication nav visibility
+          setTimeout(() => {
+            updateCommunicationNavVisibility();
+          }, 100);
+
           showApp();
           await hydrateProjects();
           await hydrateProfiles();
@@ -735,8 +900,12 @@
           document.getElementById("currentUserDisplay").innerHTML =
             `<p class="font-semibold text-sm">${state.currentUser.name}</p>
              <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-          const comm = document.getElementById("commNavLink");
-          if (comm) comm.style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+
+          // FIX: Update communication nav visibility
+          setTimeout(() => {
+            updateCommunicationNavVisibility();
+          }, 100);
+
           showApp();
           await hydrateProjects();
           await hydrateProfiles();
@@ -758,8 +927,12 @@
         document.getElementById("currentUserDisplay").innerHTML =
           `<p class="font-semibold text-sm">${state.currentUser.name}</p>
            <p class="text-xs text-gray-400">${state.currentUser.email} (${state.currentUser.role})</p>`;
-        const comm = document.getElementById("commNavLink");
-        if (comm) comm.style.display = state.currentUser.role === 'admin' ? 'flex' : 'none';
+
+        // FIX: Update communication nav visibility
+        setTimeout(() => {
+          updateCommunicationNavVisibility();
+        }, 100);
+
         showApp();
         Promise.all([hydrateProjects(), hydrateProfiles(), hydrateTodoLists()]).catch(console.warn);
       }
@@ -779,6 +952,109 @@
         renderMainNavLinkStates();
         renderMainContent();
         renderModals();
+        // If AI modal is open, populate its containers asynchronously
+        if (state.isAiModalOpen) {
+          setTimeout(async () => {
+            for (const taskId of Array.from(state.selectedTasksForAI)) {
+              const task = findTaskById(taskId);
+              const cont = document.getElementById(`ai-cont-${taskId}`);
+              if (!task || !cont) continue;
+              try {
+                const res = await fetch('/api/ai/suggest-assignees', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: task.content, description: task.notes || '', topK: 2 })
+                });
+                const json = await res.json();
+                const suggestions = json?.suggestions || [];
+                const usersById = Object.fromEntries((state.users || []).map(u => [String(u.id), u]));
+                cont.innerHTML = suggestions.map((s, i) => {
+                  const u = usersById[String(s.profileId)];
+                  const name = u?.name || `#${s.profileId}`;
+                  const sub = [u?.title, Array.isArray(u?.languages) && u.languages.length ? u.languages.join(', ') : ''].filter(Boolean).join(' • ');
+                  const pct = Math.round((s.score ?? 0) * 100);
+                  return `<div class=\"bg-gray-800 p-3 rounded-lg ${i === 0 ? 'border-2 border-green-500' : 'border border-gray-600'} cursor-pointer hover:bg-gray-700\" data-profile-id=\"${s.profileId}\" data-task-id=\"${taskId}\" data-score=\"${s.score}\" onclick=\"selectAiSuggestion(this)\">
+                    <p class=\"font-semibold\">${i === 0 ? 'Top Recommendation' : 'Second Choice'}: ${name}</p>
+                    ${sub ? `<div class=\"text-xs text-gray-400 mt-1\">${sub}</div>` : ''}
+                    ${s.reason ? `<div class=\"text-xs text-gray-500 mt-1\">Reason: ${s.reason}</div>` : ''}
+                    <div class=\"text-xs text-gray-300 mt-1\">Score: ${pct}%</div>
+                  </div>`;
+                }).join('') || '<div class=\"text-gray-400\">No profiles found</div>';
+              } catch {
+                cont.textContent = 'Failed to load suggestions';
+              }
+            }
+          }, 0);
+        }
+        // If on communication view, fetch logs and refresh table
+        if (state.currentView === 'communicationView') {
+          (async () => {
+            try {
+              const { logs } = await apiFetch('/api/communications');
+              state.communicationLogs = (logs || []).map(l => ({
+                timestamp: new Date(l.timestamp).toLocaleString(),
+                recipient: l.recipient || '-',
+                summary: l.summary || '',
+              }));
+              const main = document.getElementById('mainContent');
+              if (main) main.innerHTML = renderCommunicationView();
+            } catch { }
+          })();
+        }
+        updateCommunicationNavVisibility(); // Add this line
+      }
+
+      // Handle clicking on AI suggestions in both modals
+      window.selectAiSuggestion = function (element) {
+        const profileId = element.dataset.profileId;
+        const taskId = element.dataset.taskId;
+
+        if (state.isAiModalOpen) {
+          // In Analyze & Assign modal - update the task's assignee
+          const task = findTaskById(parseInt(taskId));
+          if (task) {
+            const user = state.users.find(u => u.id == profileId);
+            if (user) {
+              task.assigneeId = parseInt(profileId);
+              task.assignee = user.name;
+
+              // Highlight the selected suggestion
+              const container = document.getElementById(`ai-cont-${taskId}`);
+              if (container) {
+                // Remove previous highlights
+                container.querySelectorAll('.selected-suggestion').forEach(el => {
+                  el.classList.remove('selected-suggestion', 'bg-green-600', 'border-green-400');
+                  el.classList.add('bg-gray-800');
+                });
+                // Highlight current selection
+                element.classList.add('selected-suggestion', 'bg-green-600', 'border-green-400');
+                element.classList.remove('bg-gray-800');
+
+                // Add checkmark to show it's selected
+                element.innerHTML = element.innerHTML.replace(
+                  /<div class="text-xs text-gray-300 mt-1">Score: \d+%<\/div>/,
+                  '<div class="text-xs text-gray-300 mt-1">Score: ' + Math.round((element.dataset.score || 0) * 100) + '%</div><div class="text-xs text-green-300 mt-1">✓ Selected</div>'
+                );
+              }
+
+              // Update the task in the database (no immediate render to preserve selection)
+              apiFetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                body: { assigneeId: parseInt(profileId) }
+              }).catch(err => {
+                console.error('Failed to assign:', err);
+              });
+            }
+          }
+        } else {
+          // In task modal - update the assignee dropdown
+          const assigneeSelect = document.querySelector('select[name="assignee"]');
+          if (assigneeSelect) {
+            assigneeSelect.value = profileId;
+            // Close the suggestions panel
+            const suggestionsEl = document.getElementById('aiSuggestions');
+            if (suggestionsEl) suggestionsEl.classList.add('hidden');
+          }
+        }
       }
       function renderProjectsNav() {
         const nav = document.getElementById("projectNav");
@@ -808,12 +1084,8 @@
           case "todoView": viewTitle.textContent = "To-Do Lists"; content = renderTodoView(); break;
           case "taskTrackingView": viewTitle.textContent = "Task Tracking Matrix"; content = renderTaskTrackingView(); break;
           case "communicationView":
-            if (state.currentUser.role !== 'admin') {
-              content = `<div class="h-full flex flex-col items-center justify-center text-center"><span class="material-icons-outlined text-5xl text-red-500 mb-4">lock</span><h2 class="text-2xl font-bold">Access Denied</h2><p class="text-gray-400 mt-2">You do not have permission to view this page.</p></div>`;
-            } else {
-              viewTitle.textContent = "Communication";
-              content = renderCommunicationView();
-            }
+            viewTitle.textContent = "Communication";
+            content = renderCommunicationView();
             break;
           case "profileView": viewTitle.textContent = "Developer Profiles"; content = renderProfileView(); break;
           case "milestonesView": viewTitle.textContent = "Milestones"; content = renderMilestonesView(); break;
@@ -859,34 +1131,76 @@
         const tasks = col.tasks || [];
         return `<div class="bg-gray-800 rounded-xl p-4 w-80 flex-shrink-0 flex flex-col h-full column drop-zone" data-column-id="${col.id}">
           <h3 class="font-bold text-lg text-cyan-300 mb-4">${col.title} (${tasks.length})</h3>
-          <div class="tasks-container flex-grow space-y-4">${tasks.map((t) => createTaskCardHTML(t)).join("")}</div>
+          <div class="tasks-container flex-grow space-y-4 overflow-y-auto overflow-x-hidden">${tasks.map((t) => createTaskCardHTML(t)).join("")}</div>
         </div>`;
       }
+      // 1) Put this helper anywhere above your renderers
+      function getAssigneeName(task, users = state.users) {
+        if (task?.assignee && typeof task.assignee === "string") return task.assignee;
+        // Handle when "assignee" accidentally carries the numeric id
+        if (task?.assignee != null && typeof task.assignee !== "string") {
+          const candidateId = Number(task.assignee);
+          if (Number.isFinite(candidateId)) {
+            const uNum = users.find((x) => Number(x.id) === candidateId);
+            if (uNum) return uNum.name || "";
+          }
+        }
+        if (task?.assigneeId != null) {
+          const u = users.find((x) => Number(x.id) === Number(task.assigneeId));
+          if (u) return u.name || "";
+        }
+        return "";
+      }
+
+      // Normalize a date input to YYYY-MM-DD if user typed DD-MM-YYYY
+      function normalizeDateInput(value) {
+        if (!value) return null;
+        // If already ISO-like YYYY-MM-DD, keep it
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+        // Convert DD-MM-YYYY → YYYY-MM-DD
+        const m = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (m) {
+          const [, dd, mm, yyyy] = m;
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        return value; // fallback
+      }
+
+      // 2) Replace createTaskCardHTML with this version
       function createTaskCardHTML(task) {
-        const assignee = state.users.find((u) => u.name === task.assignee);
+        const assigneeName = getAssigneeName(task);
+
         return `<div class="bg-gray-700 p-4 rounded-lg shadow-md hover:bg-gray-600/70 relative task-card" draggable="true" data-task-id="${task.id}">
-          <input type="checkbox" class="task-checkbox absolute top-2 right-2 h-5 w-5 bg-gray-600 border-gray-500 rounded text-indigo-500" data-task-id="${task.id}">
-          <div class="cursor-pointer task-content" data-task-id="${task.id}">
-            <p class="font-medium pr-8">${task.content}</p>
-            <div class="flex items-center justify-between mt-4 text-sm text-gray-400">
-              <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority] || "bg-gray-600 text-gray-300"}">${task.priority || "Medium"}</span>
-              ${assignee ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">${assignee.name}</span>` : ""}
-            </div>
-          </div>
-        </div>`;
+    <input type="checkbox" class="task-checkbox absolute top-2 right-2 h-5 w-5 bg-gray-600 border-gray-500 rounded text-indigo-500" data-task-id="${task.id}">
+    <div class="cursor-pointer task-content" data-task-id="${task.id}">
+      <p class="font-medium pr-8">${task.content}</p>
+      <div class="flex items-center justify-between mt-4 text-sm text-gray-400">
+        <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority] || "bg-gray-600 text-gray-300"}">
+          ${task.priority || "Medium"}
+        </span>
+        ${assigneeName
+            ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">${assigneeName}</span>`
+            : ""
+          }
+      </div>
+    </div>
+  </div>`;
       }
+
+
       function renderTableView(project) {
         const container = document.getElementById("kanbanTableView");
         if (!container) return;
         let table = `<table class="w-full text-sm text-left"><thead class="text-xs text-gray-400 uppercase bg-gray-700/50"><tr><th class="px-6 py-3">Task</th><th class="px-6 py-3">Status</th><th class="px-6 py-3">Priority</th><th class="px-6 py-3">Assignee</th><th class="px-6 py-3">Due Date</th></tr></thead><tbody>`;
         project.columns.forEach((col) => {
           col.tasks.forEach((task) => {
-            const assignee = state.users.find((u) => u.name === task.assignee);
+            // const assignee = state.users.find((u) => u.name === task.assignee);
+            const assigneeName = getAssigneeName(task);
             table += `<tr class="border-b border-gray-700">
               <td class="px-6 py-4 font-medium">${task.content}</td>
               <td class="px-6 py-4">${col.title}</td>
               <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority] || "bg-gray-600 text-gray-300"}">${task.priority || "Medium"}</span></td>
-              <td class="px-6 py-4">${assignee ? assignee.name : "Unassigned"}</td>
+              <td class="px-6 py-4">${assigneeName || "Unassigned"}</td>
               <td class="px-6 py-4">${task.dueDate || "N/A"}</td>
             </tr>`;
           });
@@ -1061,7 +1375,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${state.communicationLogs.map(log => `
+                  ${(state.communicationLogs || []).map(log => `
                     <tr class="border-b border-gray-700">
                       <td class="px-6 py-4">${log.timestamp}</td>
                       <td class="px-6 py-4">${log.recipient}</td>
@@ -1178,6 +1492,7 @@
         if (state.isTaskModalOpen) modalsContainer.innerHTML += createTaskModalHTML();
         if (state.isTodoModalOpen) modalsContainer.innerHTML += createTodoModalHTML();
         if (state.isMoveToProjectModalOpen) modalsContainer.innerHTML += createMoveToProjectModalHTML();
+        if (state.isMoveTaskModalOpen) modalsContainer.innerHTML += createMoveTaskModalHTML();
         if (state.isInfoModalOpen) modalsContainer.innerHTML += createInfoModalHTML();
         if (state.isMilestoneModalOpen) modalsContainer.innerHTML += createMilestoneModalHTML();
         if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
@@ -1205,9 +1520,11 @@
         const task = state.activeTask;
         const isNew = !task;
         const taskData = isNew ? {
-          content: "", notes: "", priority: "Medium", dueDate: "", assignee: null, subtasks: [],
+          content: "", notes: "", priority: "Medium", dueDate: "",
+          assigneeId: null, assignee: null, subtasks: [],
           links: "", aiComm: { active: false, frequency: "daily", days: [], prompt: "" },
         } : task;
+
         return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4">
           <form id="taskForm" class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-700">
             <div class="p-6 border-b border-gray-700"><h2 class="text-2xl font-bold">${isNew ? "Create Task" : "Edit Task"}</h2></div>
@@ -1239,11 +1556,17 @@
                   ${Object.keys(priorityStyles).map((p) => `<option ${taskData.priority === p ? "selected" : ""}>${p}</option>`).join("")}
                 </select>
                 <input class="w-full bg-gray-700 p-2 rounded-lg" type="date" name="dueDate" value="${taskData.dueDate || ""}">
-                <select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg">
-                  <option value="">Unassigned</option>
-                  ${state.users.map((u) => `<option value="${u.name}" ${taskData.assignee === u.name ? "selected" : ""}>${u.name}</option>`).join("")}
-                  <option value="add_new">-- Add New --</option>
-                </select>
+                <div class="flex gap-2">
+                  <select name="assignee" class="w-full bg-gray-700 p-2 rounded-lg">
+                    <option value="">Unassigned</option>
+                    ${state.users.map((u) =>
+          `<option value="${u.id}" ${taskData.assigneeId == u.id ? "selected" : ""}>${u.name}</option>`
+        ).join("")}
+                    <option value="add_new">-- Add New --</option>
+                  </select>
+                  <button type="button" id="aiSuggestBtn" class="bg-indigo-600 text-white font-semibold px-3 rounded">Suggest</button>
+                </div>
+                <div id="aiSuggestions" class="hidden bg-gray-900/40 rounded p-2 text-sm"></div>
               </div>
             </div>
             <div class="p-6 border-t border-gray-700 flex justify-end gap-4">
@@ -1287,17 +1610,17 @@
         </div>`;
       }
 
-      function createMoveToProjectModalHTML() {
+      function createMoveTaskModalHTML() {
         return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
             <div class="p-6">
-              <h3 class="font-semibold mb-4">Move to which project's backlog?</h3>
-              <select id="projectSelectDropdown" class="w-full bg-gray-700 p-2 rounded-lg">
-                ${state.projects.map((p) => `<option value="${p.id}">${p.name}</option>`).join("")}
+              <h3 class="font-semibold mb-4">Move task to which project?</h3>
+              <select id="taskProjectSelectDropdown" class="w-full bg-gray-700 p-2 rounded-lg">
+                ${state.projects.filter(p => p.id !== state.activeProjectId).map((p) => `<option value="${p.id}">${p.name}</option>`).join("")}
               </select>
               <div class="flex justify-end gap-4 mt-4">
                 <button type="button" class="close-modal-btn bg-gray-600 p-2 rounded-lg text-sm">Cancel</button>
-                <button id="confirmMoveBtn" class="bg-cyan-600 p-2 rounded-lg text-sm">Confirm</button>
+                <button id="confirmTaskMoveBtn" class="bg-blue-600 p-2 rounded-lg text-sm">Confirm Move</button>
               </div>
             </div>
           </div>
@@ -1377,15 +1700,14 @@
         let content = "";
         state.selectedTasksForAI.forEach((taskId) => {
           const task = findTaskById(taskId);
-          if (task) {
-            content += `<div class="bg-gray-700 p-4 rounded-lg">
+          if (!task) return;
+          // Build suggestions using the same API we wired for the modal Suggest button.
+          // We render a placeholder container; it will be populated after render() via fetch.
+          const cid = `ai-cont-${taskId}`;
+          content += `<div class="bg-gray-700 p-4 rounded-lg">
               <h4 class="font-bold text-lg">${task.content}</h4>
-              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gray-800 p-3 rounded-lg border-2 border-green-500"><p class="font-semibold">Top Recommendation: John Smith</p><p class="text-sm text-gray-400 mt-1">Reason: John's skills in Node.js and PostgreSQL are a perfect match for this backend task.</p></div>
-                <div class="bg-gray-800 p-3 rounded-lg border border-gray-600"><p class="font-semibold">Second Choice: Alex Ray</p><p class="text-sm text-gray-400 mt-1">Reason: Alex has full-stack experience and can handle the task if John is unavailable.</p></div>
-              </div>
+              <div id="${cid}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">Loading suggestions...</div>
             </div>`;
-          }
         });
         return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-700">
@@ -1393,7 +1715,7 @@
             <div class="p-6 max-h-[60vh] overflow-y-auto space-y-4">${content || "<p class='text-gray-400'>No tasks selected.</p>"}</div>
             <div class="p-6 border-t border-gray-700 flex justify-end gap-4">
               <button type="button" class="close-modal-btn bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Close</button>
-              <button class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg">Accept & Assign</button>
+              <button id="aiAcceptAssignBtn" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg">Accept & Assign</button>
             </div>
           </div>
         </div>`;
@@ -1457,23 +1779,41 @@
         }
       }
 
-      function moveTaskToColumn(taskId, sourceColumnId, targetColumnId) {
+      async function moveTaskToColumn(taskId, sourceColumnId, targetColumnId) {
         const project = state.projects.find(p => p.id === state.activeProjectId);
         if (!project) return;
 
         const sourceColumn = project.columns.find(c => c.id === sourceColumnId);
         const targetColumn = project.columns.find(c => c.id === targetColumnId);
-
         if (!sourceColumn || !targetColumn) return;
 
-        const taskIndex = sourceColumn.tasks.findIndex(t => t.id === taskId);
-        if (taskIndex === -1) return;
+        const idx = sourceColumn.tasks.findIndex(t => t.id === taskId);
+        if (idx === -1) return;
 
-        const [task] = sourceColumn.tasks.splice(taskIndex, 1);
+        const [task] = sourceColumn.tasks.splice(idx, 1);
         targetColumn.tasks.push(task);
+
+        // Persist status change to API
+        try {
+          const newApiStatus = uiToApiStatus[targetColumn.title] || "todo";
+          await apiFetch(`/api/tasks/${taskId}`, {
+            method: "PATCH",
+            body: { status: newApiStatus },
+          });
+        } catch (err) {
+          // rollback on error
+          targetColumn.tasks.pop();
+          sourceColumn.tasks.splice(idx, 0, task);
+          alert(err?.data?.error || "Failed to update task status");
+          return;
+        }
+
+        // keep Task Tracking Matrix in sync
+        syncTaskTrackingFromProject(project);
 
         render();
       }
+
 
       // ---------- Export Functionality ----------
       function setupExportButtons() {
@@ -1657,6 +1997,37 @@
           render();
         }
 
+        // Move task to another project
+        if (target.closest(".move-task-btn")) {
+          state.taskToMove = parseInt(target.closest("[data-task-id]").dataset.taskId);
+          state.isMoveTaskModalOpen = true;
+          render();
+        }
+
+        if (target.id === "confirmTaskMoveBtn") {
+          const targetProjectId = parseInt(document.getElementById("taskProjectSelectDropdown").value);
+          const taskId = state.taskToMove;
+
+          try {
+            await apiFetch(`/api/tasks/${taskId}/move`, {
+              method: "POST",
+              body: { projectId: targetProjectId },
+            });
+
+            // Close modal and clear state
+            state.isMoveTaskModalOpen = false;
+            state.taskToMove = null;
+
+            // Refresh both source and target projects
+            await hydrateTasksForProject(state.activeProjectId);
+            await hydrateTasksForProject(targetProjectId);
+
+            render();
+          } catch (err) {
+            alert(err?.data?.error || "Failed to move task");
+          }
+        }
+
         // Move To-Do item to Project backlog
         if (target.closest(".move-to-project-btn")) {
           state.itemToMove = parseInt(target.closest("[data-item-id]").dataset.itemId);
@@ -1665,17 +2036,49 @@
         if (target.id === "confirmMoveBtn") {
           const targetProjectId = parseInt(document.getElementById("projectSelectDropdown").value);
           const activeList = state.todoLists.find((l) => l.id === state.activeTodoListId);
-          const idx = activeList.items.findIndex((i) => i.id === state.itemToMove);
+          const idx = activeList?.items.findIndex((i) => i.id === state.itemToMove);
           if (idx === -1) return;
-          const itemId = activeList.items[idx].id;
+
+          const movedItem = activeList.items[idx];
+          const itemId = movedItem.id;
+
           try {
-            await apiFetch(`/api/todos/items/${itemId}/move`, { method: "POST", body: { projectId: targetProjectId } });
+            await apiFetch(`/api/todos/items/${itemId}/move`, {
+              method: "POST",
+              body: { projectId: targetProjectId },
+            });
+
+            // ✅ close ALL related modals & clear temp state
             state.isMoveToProjectModalOpen = false;
+            state.isTodoModalOpen = false;      // <- this is the one in your screenshot
+            state.activeTodoItem = null;
+            state.itemToMove = null;
+
+            // refresh list items
             await loadTodoItems(state.activeTodoListId);
+
+            // make sure target project is hydrated, then add to Backlog (or re-hydrate tasks)
+            let project = state.projects.find((p) => p.id === targetProjectId);
+            if (project && !project._tasksLoaded) {
+              await hydrateTasksForProject(project.id);
+              project = state.projects.find((p) => p.id === targetProjectId);
+            }
+
+            // Don't manually add to backlog - let the API response handle it
+            // The task was already created via the API call above
+
+            // Refresh the target project's tasks to show the newly moved task
+            await hydrateTasksForProject(targetProjectId);
+
+            state.activeProjectId = targetProjectId;
+            state.currentView = "dashboardView";
+            render();
           } catch (err) {
             alert(err?.data?.error || "Failed to move item");
           }
         }
+
+
 
         // Open Create Project modal
         if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
@@ -1683,11 +2086,92 @@
         // Close any modal
         if (target.closest(".close-modal-btn")) {
           state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
-          state.isInfoModalOpen = false; state.isMilestoneModalOpen = false; state.isProfileModalOpen = false;
-          state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
+          state.isMoveTaskModalOpen = false; state.isInfoModalOpen = false; state.isMilestoneModalOpen = false;
+          state.isProfileModalOpen = false; state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
         }
 
         if (target.id === "aiAnalyzeBtn") { state.isAiModalOpen = true; render(); }
+
+        // Handle AI toggle checkbox
+        if (target.id === "ai_toggle") {
+          const aiSection = target.closest('.bg-gray-900\\/50').querySelector('.hidden, .flex');
+          if (aiSection) {
+            if (target.checked) {
+              aiSection.classList.remove('hidden');
+              aiSection.classList.add('flex');
+            } else {
+              aiSection.classList.add('hidden');
+              aiSection.classList.remove('flex');
+            }
+          }
+        }
+
+        if (target.id === "aiAcceptAssignBtn") {
+          // Check which tasks have been assigned (based on state, not DOM)
+          const assignmentsToMake = [];
+          for (const taskId of state.selectedTasksForAI) {
+            const task = findTaskById(taskId);
+            if (task && task.assigneeId) { // Check if an assignee was selected for this task
+              assignmentsToMake.push({ taskId: task.id, assigneeId: task.assigneeId });
+            }
+          }
+
+          if (assignmentsToMake.length === 0) {
+            alert('Please select at least one suggestion before accepting.');
+            return;
+          }
+
+          // All assignments are already saved to database when suggestions were clicked
+          // Just close the modal and refresh the UI
+          state.isAiModalOpen = false;
+          render();
+          alert(`Applied ${assignmentsToMake.length} assignment(s) successfully!`);
+        }
+
+        if (target.id === "aiSuggestBtn") {
+          const form = document.getElementById("taskForm");
+          if (!form) return;
+          const fd = new FormData(form);
+          const title = String(fd.get("content") || "").trim();
+          const description = String(fd.get("notes") || "").trim();
+          if (!title) return;
+          const infoEl = document.getElementById("aiSuggestions");
+          if (infoEl) { infoEl.classList.remove("hidden"); infoEl.textContent = "Analyzing..."; }
+          try {
+            const res = await fetch('/api/ai/suggest-assignees', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, description, topK: 3 })
+            });
+            const json = await res.json();
+            const suggestions = json?.suggestions || [];
+            const usersById = Object.fromEntries((state.users || []).map(u => [String(u.id), u]));
+            if (infoEl) {
+              infoEl.innerHTML = suggestions.map((s, i) => {
+                const u = usersById[String(s.profileId)];
+                const name = u?.name || `#${s.profileId}`;
+                const titleTxt = u?.title ? ` - ${u.title}` : "";
+                const skills = Array.isArray(u?.languages) && u.languages.length ? `<div class=\"text-xs text-gray-400\">${u.languages.join(', ')}</div>` : "";
+                const pct = Math.round((s.score ?? 0) * 100);
+                const reason = s.reason ? `<div class=\"text-xs text-gray-500\">${s.reason}</div>` : "";
+                return `<div class=\"flex items-start justify-between gap-3 bg-gray-800/60 rounded p-2 cursor-pointer hover:bg-gray-700\" data-profile-id=\"${s.profileId}\" onclick=\"selectAiSuggestion(this)\">
+                  <div>
+                    <div class=\"font-medium\">${i + 1}. ${name}${titleTxt}</div>
+                    ${skills}
+                    ${reason}
+                  </div>
+                  <div class=\"text-gray-300\">${pct}%</div>
+                </div>`;
+              }).join("") || "No profiles found";
+            }
+            const top = suggestions[0];
+            if (top) {
+              const sel = form.querySelector('select[name="assignee"]');
+              if (sel) { sel.value = String(top.profileId); }
+            }
+          } catch (err) {
+            if (infoEl) infoEl.textContent = 'Failed to analyze';
+          }
+        }
 
         const taskContent = target.closest(".task-content");
         if (taskContent) {
@@ -1775,11 +2259,15 @@
         const form = e.target;
 
         // Create / Edit Task
+        // Create / Edit Task (persist to API + keep local aiComm config)
         if (form.id === "taskForm") {
           e.preventDefault();
+
           const formData = new FormData(form);
           const data = Object.fromEntries(formData.entries());
-          const taskData = {
+
+          // Keep your original UI fields (aiComm etc.) in case you store them locally
+          const uiTaskData = {
             content: data.content,
             notes: data.notes,
             assignee: data.assignee,
@@ -1794,47 +2282,116 @@
             }
           };
 
-          if (state.activeTask) {
-            // Update existing task
-            Object.assign(state.activeTask, taskData);
-            state.isTaskModalOpen = false;
-            render();
-          } else {
-            // Create new task - add to backlog of active project
-            const project = state.projects.find((p) => p.id === state.activeProjectId);
-            if (project) {
-              project.columns[0].tasks.push({
-                id: Date.now(),
-                subtasks: [],
-                ...taskData
+          // UI → API mapping for /api/tasks
+          const payload = {
+            projectId: state.activeProjectId,
+            title: data.content,
+            description: data.notes || null,
+            assigneeId: data.assignee ? Number(data.assignee) : null, // <-- use numeric ID from the select
+            status: "todo",
+            priority: (Object.prototype.hasOwnProperty.call(uiToApiPriority, data.priority)
+              ? uiToApiPriority[data.priority]
+              : "medium"),
+            dueDate: normalizeDateInput(data.dueDate) || null,
+          };
+
+          try {
+            if (state.activeTask) {
+              // PATCH existing task in DB
+              await apiFetch(`/api/tasks/${state.activeTask.id}`, {
+                method: "PATCH",
+                body: {
+                  title: payload.title,
+                  description: payload.description,
+                  priority: payload.priority,
+                  dueDate: payload.dueDate,
+                  assigneeId: payload.assigneeId,
+                },
               });
-              state.isTaskModalOpen = false;
-              render();
+
+              // Keep your local-only fields (like aiComm) attached to the active task
+              Object.assign(state.activeTask, uiTaskData);
+
+              // Persist AI communication settings to backend
+              await apiFetch('/api/communications', {
+                method: 'POST',
+                body: {
+                  taskId: state.activeTask.id,
+                  active: uiTaskData.aiComm.active,
+                  frequency: uiTaskData.aiComm.frequency,
+                  days: uiTaskData.aiComm.days,
+                  prompt: uiTaskData.aiComm.prompt,
+                }
+              });
+
+            } else {
+              // POST new task to DB
+              const created = await apiFetch(`/api/tasks`, { method: "POST", body: payload });
+              // Persist AI communication settings for new task
+              await apiFetch('/api/communications', {
+                method: 'POST',
+                body: {
+                  taskId: created.id,
+                  active: uiTaskData.aiComm.active,
+                  frequency: uiTaskData.aiComm.frequency,
+                  days: uiTaskData.aiComm.days,
+                  prompt: uiTaskData.aiComm.prompt,
+                }
+              });
             }
+
+            // Close modal
+            state.isTaskModalOpen = false;
+            state.activeTask = null;
+
+            // Rehydrate from server (ensures board + matrix reflect DB)
+            await hydrateTasksForProject(state.activeProjectId);
+
+            render();
+          } catch (err) {
+            alert(err?.data?.error || "Failed to save task");
           }
         }
 
+        // Create / Edit To-Do Item
         // Create / Edit To-Do Item
         if (form.id === "todoForm") {
           e.preventDefault();
           const formData = new FormData(form);
           const data = Object.fromEntries(formData.entries());
-          const activeList = state.todoLists.find(l => l.id === state.activeTodoListId);
+          const listId = state.activeTodoListId;
 
-          if (state.activeTodoItem) {
-            // Update existing item
-            Object.assign(state.activeTodoItem, data);
-          } else {
-            // Create new item
-            activeList.items.push({
-              id: Date.now(),
-              ...data,
-              subtasks: [],
-              createdAt: Date.now()
-            });
+          // Map UI fields -> API payload
+          const payload = {
+            content: data.content,
+            description: data.description || null,
+            link: data.links || null,
+            considerations: data.thingsToConsider || null,
+            priority: (data.priority || "Medium"),            // your backend expects "Low|Medium|High|Urgent"
+            dueDate: data.dueDate || null,
+            assigneeId: data.assignee || null,
+            tags: [],                                         // keep empty or map subtasks if you add that UI
+            status: "open",                                   // or whatever you want as default
+          };
+
+          try {
+            if (state.activeTodoItem) {
+              // UPDATE existing item -> PATCH /api/todos/items/:id
+              const id = state.activeTodoItem.id;
+              await apiFetch(`/api/todos/items/${id}`, { method: "PATCH", body: payload });
+            } else {
+              // CREATE item in DB -> POST /api/todos/lists/:id/items
+              await apiFetch(`/api/todos/lists/${listId}/items`, { method: "POST", body: payload });
+            }
+
+            // Close modal + refresh from server so we have real IDs
+            state.isTodoModalOpen = false;
+            state.activeTodoItem = null;
+            await loadTodoItems(listId);
+          } catch (err) {
+            alert(err?.data?.error || "Failed to save item");
           }
-          state.isTodoModalOpen = false;
-          render();
+          return;
         }
 
         // Create / Edit Milestone
@@ -1864,6 +2421,7 @@
             }
             state.isMilestoneModalOpen = false;
             state.activeMilestone = null;
+            // Force re-render to update milestone counts in project cards
             render();
           } catch (err) {
             alert(err?.data?.error || "Failed to save milestone");
@@ -1896,33 +2454,56 @@
         }
 
         // Create Profile
+        // ----- REPLACE the existing "Create Profile" submit handler with this -----
         if (form.id === "profileForm") {
           e.preventDefault();
-          const formData = new FormData(form);
-          const data = Object.fromEntries(formData.entries());
+
+          // Read raw inputs
+          const el = (name) => form.querySelector(`[name="${name}"]`);
+          const fullName = el("fullName").value.trim();
+          const title = el("title").value.trim();
+          const description = el("description").value.trim();
+          const email = el("email").value.trim();
+          const phone = el("phone").value.trim();
+          const linkedinUrl = el("linkedinUrl").value.trim();
+          const githubUrl = el("githubUrl").value.trim();
+          const languagesRaw = el("languages").value.trim();
+          const adminFeedback = el("adminFeedback").value.trim();
+          const resumeInput = el("resume");
+
+
+          // Build FormData (so file upload works and server's multipart branch runs)
+          const fd = new FormData();
+          // If you have a logged-in user id/email, set it appropriately; null is fine too
+          // fd.append("userId", String(currentUserId));
+          // fd.append("userId", ""); // optional
+
+          fd.append("fullName", fullName);
+          fd.append("title", title || "");
+          fd.append("description", description || "");
+          fd.append("email", email || "");
+          fd.append("phone", phone || "");
+          fd.append("linkedinUrl", linkedinUrl || "");
+          fd.append("githubUrl", githubUrl || "");
+
+          // Your server's toLanguages() accepts JSON array OR comma-separated text.
+          // We'll send JSON so it’s unambiguous.
+          const languages = languagesRaw
+            ? languagesRaw.split(",").map(s => s.trim()).filter(Boolean)
+            : [];
+          fd.append("languages", JSON.stringify(languages));
+
+          fd.append("adminFeedback", adminFeedback || "");
+
+          // Attach file if chosen
+          if (resumeInput?.files?.[0]) {
+            fd.append("resume", resumeInput.files[0]);
+          }
+
           try {
-            const profileData = {
-              full_name: data.fullName,
-              title: data.title || "",
-              description: data.description || "",
-              email: data.email || "",
-              phone: data.phone || "",
-              linkedin_url: data.linkedinUrl || "",
-              github_url: data.githubUrl || "",
-              languages: data.languages.split(',').map(s => s.trim()).filter(Boolean),
-              admin_feedback: data.adminFeedback || ""
-            };
+            const created = await apiUpload("/api/profiles", fd);
 
-            // Handle file upload if resume is provided
-            if (data.resume && data.resume.size > 0) {
-              const uploadFormData = new FormData();
-              uploadFormData.append("resume", data.resume);
-              // You would need to implement the resume upload endpoint
-              // const resumeResult = await apiUpload("/api/profiles/upload-resume", uploadFormData);
-              // profileData.resume_url = resumeResult.url;
-            }
-
-            const created = await apiFetch("/api/profiles", { method: "POST", body: profileData });
+            // Normalize into your UI shape
             state.users.push({
               id: created.id,
               name: created.full_name,
@@ -1937,15 +2518,100 @@
               avatar: "...",
               resumeUrl: created.resume_url || null,
             });
+
             state.isProfileModalOpen = false;
             render();
           } catch (err) {
-            alert(err?.data?.error || "Failed to create profile");
+            // Make Zod errors readable
+            const z = err?.data?.error;
+            const fieldErrs = z?.fieldErrors
+              ? Object.entries(z.fieldErrors)
+                .map(([k, arr]) => `${k}: ${(arr || []).join(", ")}`)
+                .join("\n")
+              : null;
+            alert(fieldErrs || z?.formErrors?.join?.(", ") || err?.data?.error || "Failed to create profile");
           }
         }
+
+
+        // Telegram API call when a new profile is created
+
+        // Telegram notification function
+        async function sendTelegramNotification(profileId, task, projectName) {
+          try {
+            const result = await apiFetch('/api/telegram/send-message', {
+              method: 'POST',
+              body: {
+                profileId: profileId,
+                task: {
+                  id: task.id,
+                  title: task.content || task.title,
+                  description: task.notes || '',
+                  projectName: projectName,
+                  startDate: task.startDate || '',
+                  endDate: task.dueDate || ''
+                },
+                adminEmail: state.currentUser?.email || 'admin@example.com',
+                aiUrl: `${window.location.origin}/ai-assistant`
+              }
+            });
+
+            if (result.ok) {
+              console.log('Telegram notification sent successfully');
+              return { success: true, messageId: result.message_id };
+            } else {
+              console.log('Telegram notification failed:', result.reason);
+              return { success: false, reason: result.reason };
+            }
+          } catch (error) {
+            console.error('Failed to send Telegram notification:', error);
+            return { success: false, error: error.message };
+          }
+        }
+        const project = state.projects.find(p => p.id === state.activeProjectId);
+        const projectName = project ? project.name : '';
+
+        const taskForMsg = {
+          id: state.activeTask ? state.activeTask.id : created?.id,    // created from your POST response
+          title: payload.title,
+          description: payload.description || '',
+          projectName,
+          startDate: '',                           // set if you have it
+          endDate: payload.dueDate || ''
+        };
+
+        if (payload.assigneeId) {
+          try {
+            const res = await apiFetch('/api/telegram/send-message', {
+              method: 'POST',
+              body: {
+                profileId: Number(payload.assigneeId),
+                task: taskForMsg,
+                adminEmail: state.currentUser?.email || 'admin@example.com',
+                aiUrl: `${window.location.origin}/ai-assistant`
+              }
+            });
+            if (!res.ok) {
+              console.warn('Telegram message not sent:', res.reason || res.error);
+              // Optional: toast user if res.reason === 'no_chat_id' to ask dev to /start + share phone
+            }
+          } catch (err) {
+            console.warn('Telegram send failed:', err);
+          }
+        }
+
+        if (result.ok) {
+          console.log('Telegram message sent successfully');
+        } else {
+          console.log('Failed to send Telegram message:', result.reason);
+        }
+
+
       });
 
       // Initial render
+
+
       render();
     });
   </script>
