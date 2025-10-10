@@ -82,21 +82,8 @@ export async function POST(
     status: "todo",
     priority: priorityMap[existing.priority || "Medium"] || "medium",
     dueDate: strOrNull(existing.dueDate), // '' -> null
+    _isFromTodo: true, // Flag to indicate this is from todo item
   };
-
-  // Check for duplicate task titles in the same project before creating
-  const { query: pgQuery } = await import("@/lib/db");
-  const { rows: existingTasks } = await pgQuery(
-    "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2)",
-    [taskPayload.projectId, taskPayload.title]
-  );
-  
-  if (existingTasks.length > 0) {
-    return NextResponse.json(
-      { error: `A task with the title "${taskPayload.title}" already exists in this project` },
-      { status: 400 }
-    );
-  }
 
   const createdTask = await createTask(taskPayload);
 

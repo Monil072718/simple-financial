@@ -36,5 +36,48 @@ export async function POST(req: NextRequest) {
   }
   
   const task = await createTask(parsed.data);
+  
+  // Send Telegram notification if task is assigned
+  if (parsed.data.assigneeId) {
+    try {
+      const { sendTaskAssignedMsg } = await import("@/lib/telegram");
+      const { getProfile } = await import("@/lib/profiles");
+      const { query } = await import("@/lib/db");
+      
+      const profile = await getProfile(parsed.data.assigneeId);
+      if (profile && (profile as any).telegram_chat_id) {
+        const projectResult = await query("SELECT name FROM projects WHERE id = $1", [parsed.data.projectId]);
+        const projectName = projectResult.rows[0]?.name || "Unknown Project";
+        
+        const taskMsg = {
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          projectName,
+          priority: task.priority,
+          endDate: task.due_date,
+          aiComm: {
+            active: false,
+            frequency: "daily",
+            days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+            prompt: ""
+          }
+        };
+        
+        const profileLite = {
+          id: profile.id,
+          name: profile.full_name,
+          telegram_chat_id: (profile as any).telegram_chat_id,
+          email: profile.email
+        };
+        
+        await sendTaskAssignedMsg(profileLite, taskMsg, user.email || "admin@example.com");
+      }
+    } catch (error) {
+      console.error("Failed to send Telegram notification:", error);
+      // Don't fail the task creation if Telegram fails
+    }
+  }
+  
   return NextResponse.json(task, { status: 201 });
 }

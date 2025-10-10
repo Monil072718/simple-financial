@@ -192,13 +192,13 @@
         <form id="loginForm">
           <div class="mb-4">
             <label for="email" class="block text-gray-400 text-sm font-bold mb-2">Email Address</label>
-            <input type="email" id="email" value="project.manager@example.com"
+            <input type="email" id="email" placeholder="Enter your email"
               class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
               required />
           </div>
           <div class="mb-6">
             <label for="password" class="block text-gray-400 text-sm font-bold mb-2">Password</label>
-            <input type="password" id="password" value="password"
+            <input type="password" id="password" placeholder="Enter your password"
               class="w-full bg-gray-900 border-2 border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
               required />
           </div>
@@ -335,6 +335,7 @@
     const API_BASE = "";
     const LS_TOKEN_KEY = "nf_token";
     const LS_USER_KEY = "nf_user";
+    const LS_CURRENT_VIEW_KEY = "nf_current_view";
 
     async function apiFetch(path, { method = "GET", body, headers = {} } = {}) {
       const token = localStorage.getItem(LS_TOKEN_KEY);
@@ -395,6 +396,15 @@
     function clearAuth() {
       localStorage.removeItem(LS_TOKEN_KEY);
       localStorage.removeItem(LS_USER_KEY);
+      localStorage.removeItem(LS_CURRENT_VIEW_KEY);
+    }
+    
+    function saveCurrentView(view) {
+      localStorage.setItem(LS_CURRENT_VIEW_KEY, view);
+    }
+    
+    function loadCurrentView() {
+      return localStorage.getItem(LS_CURRENT_VIEW_KEY) || "dashboardView";
     }
 
     // ==== Task & Priority mappers (UI <-> API) ====
@@ -453,7 +463,7 @@
       // ---------- State ----------
       let state = {
         currentUser: null,
-        currentView: "dashboardView",
+        currentView: loadCurrentView(),
         dashboardMode: "board",
         profileViewMode: "grid",
         calendarDate: new Date(),
@@ -473,12 +483,14 @@
         isProfileModalOpen: false,
         isAiModalOpen: false,
         isProjectModalOpen: false,
+        isShareModalOpen: false,
 
         infoModalContent: { title: "", body: "" },
         activeMilestone: null, // holds milestone object when editing
         itemToMove: null,
         taskToMove: null,
         selectedTasksForAI: new Set(),
+        taskToShare: null,
 
         gridData: [
           ["Task Name", "Assignee", "Mon", "Tue", "Wed", "Thu", "Fri", "Status"],
@@ -1178,10 +1190,12 @@
         <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${priorityStyles[task.priority] || "bg-gray-600 text-gray-300"}">
           ${task.priority || "Medium"}
         </span>
-        ${assigneeName
-            ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">${assigneeName}</span>`
-            : ""
-          }
+        <div class="flex items-center gap-1">
+          ${assigneeName
+              ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">${assigneeName}</span>`
+              : ""
+            }
+        </div>
       </div>
     </div>
   </div>`;
@@ -1498,6 +1512,7 @@
         if (state.isProfileModalOpen) modalsContainer.innerHTML += createProfileModalHTML();
         if (state.isAiModalOpen) modalsContainer.innerHTML += createAiModalHTML();
         if (state.isProjectModalOpen) modalsContainer.innerHTML += createProjectModalHTML();
+        if (state.isShareModalOpen) modalsContainer.innerHTML += createShareModalHTML();
       }
 
       function createProjectModalHTML() {
@@ -1514,6 +1529,50 @@
             </div>
           </form>
         </div>`;
+      }
+
+      function createShareModalHTML() {
+        const task = state.taskToShare;
+        if (!task) return '';
+        
+        const assigneeName = getAssigneeName(task);
+        const project = state.projects.find(p => p.id === state.activeProjectId);
+        const projectName = project ? project.name : 'Unknown Project';
+        
+        const taskDetails = {
+          title: task.content,
+          description: task.notes || 'No description provided',
+          project: projectName,
+          assignee: assigneeName || 'Unassigned',
+          priority: task.priority || 'Medium',
+          dueDate: task.dueDate || 'No due date',
+          aiCommunication: task.aiComm?.active ? 
+            `${task.aiComm.frequency} (${(task.aiComm.days || []).join(', ')})` : 'Disabled',
+          aiPrompt: task.aiComm?.prompt || 'No AI prompt set',
+          referenceLink: task.links || 'No reference link',
+          createdAt: new Date().toLocaleDateString(),
+          status: 'Active'
+        };
+
+        const shareText = `📋 **Task Details**
+
+**Title:** ${taskDetails.title}
+**Project:** ${taskDetails.project}
+**Assignee:** ${taskDetails.assignee}
+**Priority:** ${taskDetails.priority}
+**Due Date:** ${taskDetails.dueDate}
+**Status:** ${taskDetails.status}
+
+**Description:**
+${taskDetails.description}
+
+**AI Communication:** ${taskDetails.aiCommunication}
+${taskDetails.aiPrompt !== 'No AI prompt set' ? `**AI Prompt:** ${taskDetails.aiPrompt}` : ''}
+${taskDetails.referenceLink !== 'No reference link' ? `**Reference:** ${taskDetails.referenceLink}` : ''}
+
+Created: ${taskDetails.createdAt}`;
+
+
       }
 
       function createTaskModalHTML() {
@@ -1621,6 +1680,23 @@
               <div class="flex justify-end gap-4 mt-4">
                 <button type="button" class="close-modal-btn bg-gray-600 p-2 rounded-lg text-sm">Cancel</button>
                 <button id="confirmTaskMoveBtn" class="bg-blue-600 p-2 rounded-lg text-sm">Confirm Move</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      function createMoveToProjectModalHTML() {
+        return `<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div class="modal-content bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm">
+            <div class="p-6">
+              <h3 class="font-semibold mb-4">Move todo item to which project?</h3>
+              <select id="projectSelectDropdown" class="w-full bg-gray-700 p-2 rounded-lg">
+                ${state.projects.map((p) => `<option value="${p.id}">${p.name}</option>`).join("")}
+              </select>
+              <div class="flex justify-end gap-4 mt-4">
+                <button type="button" class="close-modal-btn bg-gray-600 p-2 rounded-lg text-sm">Cancel</button>
+                <button id="confirmMoveBtn" class="bg-cyan-600 p-2 rounded-lg text-sm">Confirm Move</button>
               </div>
             </div>
           </div>
@@ -1929,6 +2005,7 @@
 
         if (navLink) {
           state.currentView = navLink.dataset.view;
+          saveCurrentView(state.currentView);
           if (navLink.dataset.view === "milestonesView") state.activeMilestoneProjectId = null;
           render();
         }
@@ -1936,6 +2013,7 @@
         if (projectLink) {
           state.activeProjectId = parseInt(projectLink.dataset.projectId);
           state.currentView = "dashboardView";
+          saveCurrentView(state.currentView);
           const p = state.projects.find((x) => x.id === state.activeProjectId);
           if (p && !p._tasksLoaded) await hydrateTasksForProject(p.id); else render();
         }
@@ -1996,7 +2074,6 @@
           state.activeTask = null;
           render();
         }
-
         // Move task to another project
         if (target.closest(".move-task-btn")) {
           state.taskToMove = parseInt(target.closest("[data-task-id]").dataset.taskId);
@@ -2072,6 +2149,7 @@
 
             state.activeProjectId = targetProjectId;
             state.currentView = "dashboardView";
+            saveCurrentView(state.currentView);
             render();
           } catch (err) {
             alert(err?.data?.error || "Failed to move item");
@@ -2083,11 +2161,85 @@
         // Open Create Project modal
         if (target.id === "addNewProjectBtn") { state.isProjectModalOpen = true; render(); }
 
+        // Share modal functionality
+        if (target.id === "copyTaskDetails") {
+          const task = state.taskToShare;
+          if (task) {
+            const assigneeName = getAssigneeName(task);
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const projectName = project ? project.name : 'Unknown Project';
+            
+            const taskText = `📋 Task Details
+
+Title: ${task.content}
+Project: ${projectName}
+Assignee: ${assigneeName || 'Unassigned'}
+Priority: ${task.priority || 'Medium'}
+Due Date: ${task.dueDate || 'No due date'}
+Status: Active
+
+Description:
+${task.notes || 'No description provided'}
+
+AI Communication: ${task.aiComm?.active ? `${task.aiComm.frequency} (${(task.aiComm.days || []).join(', ')})` : 'Disabled'}
+${task.aiComm?.prompt ? `AI Prompt: ${task.aiComm.prompt}` : ''}
+${task.links ? `Reference: ${task.links}` : ''}
+
+Created: ${new Date().toLocaleDateString()}`;
+
+            navigator.clipboard.writeText(taskText).then(() => {
+              alert('Task details copied to clipboard!');
+            }).catch(() => {
+              alert('Failed to copy to clipboard');
+            });
+          }
+        }
+
+        
+
+        if (target.id === "exportAsText") {
+          const task = state.taskToShare;
+          if (task) {
+            const assigneeName = getAssigneeName(task);
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const projectName = project ? project.name : 'Unknown Project';
+            
+            const taskText = `📋 Task Details
+
+Title: ${task.content}
+Project: ${projectName}
+Assignee: ${assigneeName || 'Unassigned'}
+Priority: ${task.priority || 'Medium'}
+Due Date: ${task.dueDate || 'No due date'}
+Status: Active
+
+Description:
+${task.notes || 'No description provided'}
+
+AI Communication: ${task.aiComm?.active ? `${task.aiComm.frequency} (${(task.aiComm.days || []).join(', ')})` : 'Disabled'}
+${task.aiComm?.prompt ? `AI Prompt: ${task.aiComm.prompt}` : ''}
+${task.links ? `Reference: ${task.links}` : ''}
+
+Created: ${new Date().toLocaleDateString()}`;
+
+            const blob = new Blob([taskText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `task-${task.content.replace(/[^a-zA-Z0-9]/g, '-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
+        }
+
         // Close any modal
         if (target.closest(".close-modal-btn")) {
           state.isTaskModalOpen = false; state.isTodoModalOpen = false; state.isMoveToProjectModalOpen = false;
           state.isMoveTaskModalOpen = false; state.isInfoModalOpen = false; state.isMilestoneModalOpen = false;
-          state.isProfileModalOpen = false; state.isAiModalOpen = false; state.isProjectModalOpen = false; render();
+          state.isProfileModalOpen = false; state.isAiModalOpen = false; state.isProjectModalOpen = false; 
+          state.isShareModalOpen = false; state.taskToShare = null; render();
         }
 
         if (target.id === "aiAnalyzeBtn") { state.isAiModalOpen = true; render(); }
@@ -2344,6 +2496,28 @@
             state.isTaskModalOpen = false;
             state.activeTask = null;
 
+            // Send Telegram notification if task is assigned
+            if (payload.assigneeId) {
+              try {
+                const res = await apiFetch('/api/telegram/send-message', {
+                  method: 'POST',
+                  body: {
+                    profileId: Number(payload.assigneeId),
+                    task: taskForMsg,
+                    adminEmail: state.currentUser?.email || 'admin@example.com',
+                    aiUrl: `${window.location.origin}/ai-assistant`
+                  }
+                });
+                if (!res.ok) {
+                  console.warn('Telegram message not sent:', res.reason || res.error);
+                } else {
+                  console.log('Telegram notification sent successfully');
+                }
+              } catch (err) {
+                console.warn('Telegram send failed:', err);
+              }
+            }
+
             // Rehydrate from server (ensures board + matrix reflect DB)
             await hydrateTasksForProject(state.activeProjectId);
 
@@ -2549,7 +2723,15 @@
                   description: task.notes || '',
                   projectName: projectName,
                   startDate: task.startDate || '',
-                  endDate: task.dueDate || ''
+                  endDate: task.dueDate || '',
+                  priority: task.priority || 'medium',
+                  referenceLink: task.links || '',
+                  aiComm: {
+                    active: task.ai_active || false,
+                    frequency: task.ai_frequency || 'daily',
+                    days: task.ai_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                    prompt: task.ai_prompt || ''
+                  }
                 },
                 adminEmail: state.currentUser?.email || 'admin@example.com',
                 aiUrl: `${window.location.origin}/ai-assistant`
@@ -2577,7 +2759,15 @@
           description: payload.description || '',
           projectName,
           startDate: '',                           // set if you have it
-          endDate: payload.dueDate || ''
+          endDate: payload.dueDate || '',
+          priority: payload.priority || 'medium',
+          referenceLink: payload.links || '',
+          aiComm: {
+            active: payload.ai_active || false,
+            frequency: payload.ai_frequency || 'daily',
+            days: payload.ai_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            prompt: payload.ai_prompt || ''
+          }
         };
 
         if (payload.assigneeId) {

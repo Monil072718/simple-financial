@@ -1,8 +1,10 @@
 // src/lib/telegram.ts
 import { Telegraf, Markup } from "telegraf";
 
-const token = process.env.TELEGRAM_BOT_TOKEN!;
-if (!token) throw new Error("Missing TELEGRAM_BOT_TOKEN");
+const token = process.env.TELEGRAM_BOT_TOKEN;
+if (!token) {
+  console.warn("Missing TELEGRAM_BOT_TOKEN - Telegram bot will not function");
+}
 
 type TelegramGlobal = typeof globalThis & {
   __bot?: Telegraf;
@@ -13,7 +15,7 @@ type TelegramGlobal = typeof globalThis & {
 const g = globalThis as TelegramGlobal;
 
 /* ----------------------------- Boot the bot once ---------------------------- */
-if (!g.__bot) {
+if (!g.__bot && token) {
   g.__bot = new Telegraf(token);
   g.__botReady = false;
   g.__botStarted = false;
@@ -73,13 +75,17 @@ if (!g.__bot) {
   g.__botReady = true;
 }
 
-export const bot = g.__bot!;
+export const bot = g.__bot;
 
 /* ------------------------------ Start / Webhook ----------------------------- */
 let starting = false;
 
 export async function startBot() {
   if (g.__botStarted || starting) return;
+  if (!token || !g.__bot) {
+    console.warn("Cannot start Telegram bot: missing token or bot instance");
+    return;
+  }
   starting = true;
 
   try {
@@ -129,7 +135,11 @@ export async function startBot() {
 
 export async function handleTelegramUpdate(update: any) {
   try {
-    await bot.handleUpdate(update);
+    if (!g.__bot) {
+      console.warn("Telegram bot not initialized - cannot handle update");
+      return;
+    }
+    await g.__bot.handleUpdate(update);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
@@ -143,6 +153,14 @@ type TaskMsg = {
   startDate?: string;
   endDate?: string;
   projectName?: string;
+  priority?: string;
+  referenceLink?: string;
+  aiComm?: {
+    active: boolean;
+    frequency?: string;
+    days?: string[];
+    prompt?: string;
+  };
 };
 
 type ProfileLite = {
@@ -184,21 +202,40 @@ export async function sendTaskAssignedMsg(
 ): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
+    if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
     if (!g.__botStarted) await startBot();
 
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
+    
+    // Format priority with emoji
+    const priorityEmoji = {
+      'low': '🟢',
+      'medium': '🟡', 
+      'high': '🔴'
+    };
+    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    
+    // Format AI communication info
+    const aiCommText = task.aiComm?.active ? 
+      `\n🤖 AI Communication: ${task.aiComm.frequency || 'daily'}${task.aiComm.days ? ` (${task.aiComm.days.join(', ')})` : ''}` : '';
+    
     const textLines = [
-      "🆕 Task Assigned",
-      `Project: ${task.projectName || "-"}`,
-      `Title: ${task.title}`,
-      task.description ? `Details: ${task.description.slice(0, 500)}` : null,
-      task.startDate ? `Start: ${fmt(task.startDate)}` : null,
-      task.endDate ? `End: ${fmt(task.endDate)}` : null,
+      "🆕 *NEW TASK ASSIGNED*",
       "",
+      `📋 *${task.title}*`,
+      task.description ? `\n📝 ${task.description.slice(0, 500)}` : '',
+      task.projectName ? `\n🏢 Project: ${task.projectName}` : '',
+      priorityText ? `\n${priorityText}` : '',
+      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : '',
+      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : '',
+      aiCommText,
+      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : '',
+      "",
+      "─".repeat(20),
       aiBtnAllowed
-        ? "If you have questions, tap Ask AI or email Admin."
-        : `If you have questions, email Admin: ${adminEmail}`,
-      aiBtnAllowed ? "" : (aiUrl ? `AI (open in browser): ${aiUrl}` : ""),
+        ? "💡 Need help? Tap 'Ask AI' below or email admin"
+        : `💡 Questions? Email: ${adminEmail}`,
+      aiBtnAllowed ? "" : (aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : ""),
     ]
       .filter(Boolean)
       .join("\n");
@@ -207,7 +244,9 @@ export async function sendTaskAssignedMsg(
     if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
     // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    const opts: any = {};
+    const opts: any = {
+      parse_mode: 'Markdown'
+    };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
 
     const chatId = String(profile.telegram_chat_id).trim();
