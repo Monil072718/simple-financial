@@ -14,7 +14,7 @@ export async function POST(
     const taskId = Number(id);
     if (!taskId) return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
 
-    const { projectId } = await req.json().catch(() => ({} as any));
+    const { projectId } = await req.json().catch(() => ({} as Record<string, unknown>));
     if (!projectId) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
 
     // Verify the task exists and belongs to user's project
@@ -26,11 +26,10 @@ export async function POST(
       [taskId, user.id]
     );
 
-    if (!taskRows.length) {
+    const task = taskRows[0] as Record<string, unknown>;
+    if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
-
-    const task = taskRows[0];
 
     // Verify the target project exists and belongs to user
     const { rows: projectRows } = await query(
@@ -45,12 +44,12 @@ export async function POST(
     // Check for duplicate task titles in the target project
     const { rows: existingTasks } = await query(
       "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2) AND id != $3",
-      [projectId, task.title, taskId]
+      [projectId, task.title as string, taskId]
     );
     
     if (existingTasks.length > 0) {
       return NextResponse.json(
-        { error: `A task with the title "${task.title}" already exists in the target project` },
+        { error: `A task with the title "${task.title as string}" already exists in the target project` },
         { status: 400 }
       );
     }
@@ -62,9 +61,9 @@ export async function POST(
     );
 
     return NextResponse.json({ task: updatedRows[0] }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to move task", detail: err?.message ?? String(err) },
+      { error: "Failed to move task", detail: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }

@@ -95,11 +95,11 @@ export async function startBot() {
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
     const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
 
-    if (isProd) {
+    if (isProd && bot) {
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
-    } else {
+    } else if (bot) {
       // Dev → polling
       await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
@@ -110,7 +110,7 @@ export async function startBot() {
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          await bot.stop("SIGTERM");
+          if (bot) await bot.stop("SIGTERM");
         } catch {}
       };
       process.once("SIGINT", stop);
@@ -118,8 +118,9 @@ export async function startBot() {
     }
 
     g.__botStarted = true;
-  } catch (error: any) {
-    if (String(error?.response?.error_code) === "409") {
+  } catch (error: unknown) {
+    const errorCode = (error as { response?: { error_code?: unknown } })?.response?.error_code;
+    if (String(errorCode) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
@@ -133,13 +134,14 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: any) {
+export async function handleTelegramUpdate(update: Record<string, unknown>) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
-    await g.__bot.handleUpdate(update);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await g.__bot.handleUpdate(update as any);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
@@ -188,9 +190,9 @@ function fmt(s?: string) {
 }
 
 // Keep escapeMd around in case you switch back to Markdown later
-function escapeMd(text: string) {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
-}
+// function escapeMd(text: string) {
+//   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+// }
 
 /* ----------------------------- Send Task Message ---------------------------- */
 // Plain-text send with conditional inline button (https only). No Markdown fragility.
@@ -199,7 +201,7 @@ export async function sendTaskAssignedMsg(
   task: TaskMsg,
   adminEmail: string,
   aiUrl?: string
-): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
+): Promise<{ ok: boolean; reason?: string; error?: unknown; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
     if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
@@ -213,7 +215,7 @@ export async function sendTaskAssignedMsg(
       'medium': '🟡', 
       'high': '🔴'
     };
-    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase() as keyof typeof priorityEmoji] || '🟡'} ${task.priority.toUpperCase()}` : '';
     
     // Format AI communication info
     const aiCommText = task.aiComm?.active ? 
@@ -240,11 +242,11 @@ export async function sendTaskAssignedMsg(
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: any[] = [];
+    const inline_keyboard: Array<Array<{ text: string; url: string }>> = [];
     if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
     // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    const opts: any = {
+    const opts: Record<string, unknown> = {
       parse_mode: 'Markdown'
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
@@ -253,16 +255,16 @@ export async function sendTaskAssignedMsg(
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
-      const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
+      const msg = await g.__bot!.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
-    } catch (err: any) {
-      const code = err?.response?.error_code;
-      const desc = String(err?.response?.description || "");
+    } catch (err: unknown) {
+      const code = (err as { response?: { error_code?: unknown } })?.response?.error_code;
+      const desc = String((err as { response?: { description?: unknown } })?.response?.description || "");
       console.error("Telegram sendMessage failed:", { code, desc });
 
       if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
       if (code === 403) return { ok: false, reason: "user_blocked_bot" };
-      return { ok: false, error: err?.response || err };
+      return { ok: false, error: (err as { response?: unknown })?.response || err };
     }
   } catch (error) {
     console.error("Unexpected error in sendTaskAssignedMsg:", error);

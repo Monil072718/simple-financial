@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Normalize and validate chat id from DB
-    const rawChat = String((profile as any).telegram_chat_id ?? "").trim();
+    const rawChat = String((profile as Record<string, unknown>).telegram_chat_id ?? "").trim();
     const chatId = rawChat.replace(/\s+/g, "");
     if (!/^-?\d+$/.test(chatId)) {
       console.error("[SEND] bad chat id format", { rawChat, chatId });

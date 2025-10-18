@@ -33,15 +33,15 @@ export async function GET(
       )
       .all(ownerId, listId);
 
-    const items = rows.map((r: any) => ({
+    const items = (rows as Record<string, unknown>[]).map(r => ({
       ...r,
-      tags: JSON.parse(r.tags || "[]"),
+      tags: JSON.parse((r.tags as string) || "[]"),
     }));
 
     return NextResponse.json(items);
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: err?.message || "Failed to fetch items" },
+      { error: err instanceof Error ? err.message : "Failed to fetch items" },
       { status: 400 }
     );
   }
@@ -53,7 +53,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body: TodoItemPayload = await req.json().catch(() => ({} as any));
+    const body: TodoItemPayload = await req.json().catch(() => ({} as Record<string, unknown>));
     if (!body?.content || typeof body.content !== "string") {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
     }
@@ -77,7 +77,7 @@ export async function POST(
             .prepare(
               `SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?`
             )
-            .get(listId) as any).pos;
+            .get(listId) as Record<string, unknown>).pos;
 
     const info = d
       .prepare(
@@ -106,13 +106,13 @@ export async function POST(
 
     const row = d
       .prepare(`SELECT * FROM todo_items WHERE id = ?`)
-      .get(info.lastInsertRowid as number) as any;
-    row.tags = JSON.parse(row.tags || "[]");
+      .get(info.lastInsertRowid as number) as Record<string, unknown>;
+    row.tags = JSON.parse((row.tags as string) || "[]");
 
     return NextResponse.json(row, { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: err?.message || "Failed to create item" },
+      { error: err instanceof Error ? err.message : "Failed to create item" },
       { status: 400 }
     );
   }

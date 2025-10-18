@@ -12,6 +12,6 @@ export async function GET() {
 
   return NextResponse.json({
     connection: conn.rows[0],                 // { db, user, schema }
-    publicTables: tables.rows.map(t => `${t.table_schema}.${t.table_name}`),
+    publicTables: (tables.rows as Record<string, unknown>[]).map(t => `${t.table_schema}.${t.table_name}`),
   });
 }
