@@ -98,11 +98,13 @@ export async function startBot() {
       // Validate webhook URL configuration
       if (!baseUrl) {
         console.error("Missing APP_URL or PUBLIC_URL environment variable for production webhook");
+        console.error("Please set APP_URL or PUBLIC_URL in your environment variables");
         throw new Error("Missing APP_URL or PUBLIC_URL environment variable");
       }
       
       if (!process.env.TG_WEBHOOK_SECRET) {
         console.error("Missing TG_WEBHOOK_SECRET environment variable");
+        console.error("Please set TG_WEBHOOK_SECRET in your environment variables");
         throw new Error("Missing TG_WEBHOOK_SECRET environment variable");
       }
       
@@ -128,7 +130,12 @@ export async function startBot() {
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
     } else if (bot) {
-      // Dev → polling
+      // Dev → polling (skip webhook setup if env vars missing)
+      if (!baseUrl || !process.env.TG_WEBHOOK_SECRET) {
+        console.log("Development mode: Missing webhook env vars, using polling only");
+        console.log("To use webhooks in dev, set APP_URL and TG_WEBHOOK_SECRET");
+      }
+      
       await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
       await bot.launch({ dropPendingUpdates: true });
