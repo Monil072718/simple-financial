@@ -86,6 +86,17 @@ export async function startBot() {
     console.warn("Cannot start Telegram bot: missing token or bot instance");
     return;
   }
+  
+  // Skip bot startup during build processes
+  const isBuildProcess = process.env.NEXT_PHASE === 'phase-production-build' || 
+                        process.env.NEXT_PHASE === 'phase-development-build' ||
+                        process.argv.includes('build');
+  
+  if (isBuildProcess) {
+    console.log("Skipping Telegram bot startup during build process");
+    return;
+  }
+  
   starting = true;
 
   try {
@@ -345,4 +356,14 @@ async function linkTelegramToProfile(
 }
 
 /* -------------------------- Autostart in this process ----------------------- */
-startBot().catch(console.error);
+// Only start bot if we have a token and we're not in a build environment
+if (token && typeof window === 'undefined') {
+  // Check if we're in a build process by looking for build-specific env vars
+  const isBuildProcess = process.env.NEXT_PHASE === 'phase-production-build' || 
+                        process.env.NEXT_PHASE === 'phase-development-build' ||
+                        process.argv.includes('build');
+  
+  if (!isBuildProcess) {
+    startBot().catch(console.error);
+  }
+}
