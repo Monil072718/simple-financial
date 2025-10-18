@@ -93,9 +93,37 @@ export async function startBot() {
 
     // Build webhook URL (prod only)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
-    const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
-
+    
     if (isProd && bot) {
+      // Validate webhook URL configuration
+      if (!baseUrl) {
+        console.error("Missing APP_URL or PUBLIC_URL environment variable for production webhook");
+        throw new Error("Missing APP_URL or PUBLIC_URL environment variable");
+      }
+      
+      if (!process.env.TG_WEBHOOK_SECRET) {
+        console.error("Missing TG_WEBHOOK_SECRET environment variable");
+        throw new Error("Missing TG_WEBHOOK_SECRET environment variable");
+      }
+      
+      // Validate URL format
+      try {
+        const url = new URL(baseUrl);
+        if (url.protocol !== 'https:') {
+          console.error("Webhook URL must use HTTPS protocol:", baseUrl);
+          throw new Error("Webhook URL must use HTTPS protocol");
+        }
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+          console.error("Webhook URL cannot use localhost:", baseUrl);
+          throw new Error("Webhook URL cannot use localhost");
+        }
+      } catch (urlError) {
+        console.error("Invalid webhook URL format:", baseUrl, urlError);
+        throw new Error("Invalid webhook URL format");
+      }
+      
+      const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
+      
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
@@ -120,12 +148,20 @@ export async function startBot() {
     g.__botStarted = true;
   } catch (error: unknown) {
     const errorCode = (error as { response?: { error_code?: unknown } })?.response?.error_code;
+    const errorDescription = (error as { response?: { description?: unknown } })?.response?.description;
+    
     if (String(errorCode) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
           "Tips: close duplicate `next dev`, PM2 workers, Docker containers; or run `/revoke` in @BotFather."
       );
+    } else if (String(errorCode) === "400" && String(errorDescription).includes("bad webhook")) {
+      console.error("Telegram webhook error - check your APP_URL/PUBLIC_URL environment variable:");
+      console.error("- Must be a valid HTTPS URL (not localhost)");
+      console.error("- Must be accessible from the internet");
+      console.error("- Current URL:", process.env.APP_URL || process.env.PUBLIC_URL);
+      console.error("Full error:", error);
     } else {
       console.error("Failed to start Telegram bot:", error);
     }
