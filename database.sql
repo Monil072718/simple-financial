@@ -1,3 +1,4 @@
+
 -- 0) Case-insensitive email support (PostgreSQL)
 CREATE EXTENSION IF NOT EXISTS citext;
 
@@ -212,15 +213,16 @@ CREATE TRIGGER trg_todo_items_set_updated_at
 BEFORE UPDATE ON todo_items
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Milestones
 CREATE TABLE IF NOT EXISTS milestones (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id   INTEGER NOT NULL,
-  title        TEXT NOT NULL,
-  description  TEXT,
-  due_date     TEXT,
-  priority     TEXT CHECK (priority IN ('Low','Medium','High')) DEFAULT 'Medium',
-  difficulty   TEXT CHECK (difficulty IN ('Easy','Medium','Hard')) DEFAULT 'Medium',
-  created_at   TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY(project_id) REFERENCES projects(id)
+  id          SERIAL PRIMARY KEY,
+  project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT,
+  due_date    DATE,
+  priority    TEXT CHECK (priority IN ('Low','Medium','High')) DEFAULT 'Medium',
+  difficulty  TEXT CHECK (difficulty IN ('Easy','Medium','Hard')) DEFAULT 'Medium',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);

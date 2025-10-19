@@ -8,6 +8,16 @@ export async function GET() {
   console.log("[/api/health] hit");
   
   try {
+    // Check if DATABASE_URL is configured
+    if (!process.env.DATABASE_URL) {
+      console.warn("DATABASE_URL not configured - skipping database health check");
+      return NextResponse.json({ 
+        ok: true, 
+        message: "Health check passed (no database configured)",
+        database: "not_configured"
+      });
+    }
+
     await ensureSchema();
     console.log("Schema ensured successfully");
     
@@ -18,13 +28,32 @@ export async function GET() {
     return NextResponse.json({ 
       ok: true, 
       db: (r.rows[0] as Record<string, unknown>).db, 
-      now: (r.rows[0] as Record<string, unknown>).now 
+      now: (r.rows[0] as Record<string, unknown>).now,
+      database: "connected"
     });
   } catch (error) {
     console.error("Health check failed:", error);
+    
+    // Check if it's a connection error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isConnectionError = errorMessage.includes('ECONNREFUSED') || 
+                             errorMessage.includes('ENOTFOUND') ||
+                             errorMessage.includes('connect');
+    
+    if (isConnectionError) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: "Database connection failed",
+        message: "Database server is not running or not accessible",
+        database: "connection_failed",
+        details: errorMessage
+      }, { status: 503 }); // Service Unavailable
+    }
+    
     return NextResponse.json({ 
       ok: false, 
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
+      database: "error",
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
