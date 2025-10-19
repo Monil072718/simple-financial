@@ -2498,6 +2498,26 @@ Created: ${new Date().toLocaleDateString()}`;
 
             // Send Telegram notification if task is assigned
             if (payload.assigneeId) {
+              const project = state.projects.find(p => p.id === state.activeProjectId);
+              const projectName = project ? project.name : '';
+
+              const taskForMsg = {
+                id: state.activeTask ? state.activeTask.id : created?.id,
+                title: payload.title,
+                description: payload.description || '',
+                projectName,
+                startDate: '',
+                endDate: payload.dueDate || '',
+                priority: payload.priority || 'medium',
+                referenceLink: payload.links || '',
+                aiComm: {
+                  active: uiTaskData.aiComm.active || false,
+                  frequency: uiTaskData.aiComm.frequency || 'daily',
+                  days: uiTaskData.aiComm.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                  prompt: uiTaskData.aiComm.prompt || ''
+                }
+              };
+
               try {
                 const res = await apiFetch('/api/telegram/send-message', {
                   method: 'POST',
@@ -2748,45 +2768,6 @@ Created: ${new Date().toLocaleDateString()}`;
           } catch (error) {
             console.error('Failed to send Telegram notification:', error);
             return { success: false, error: error.message };
-          }
-        }
-        const project = state.projects.find(p => p.id === state.activeProjectId);
-        const projectName = project ? project.name : '';
-
-        const taskForMsg = {
-          id: state.activeTask ? state.activeTask.id : created?.id,    // created from your POST response
-          title: payload.title,
-          description: payload.description || '',
-          projectName,
-          startDate: '',                           // set if you have it
-          endDate: payload.dueDate || '',
-          priority: payload.priority || 'medium',
-          referenceLink: payload.links || '',
-          aiComm: {
-            active: payload.ai_active || false,
-            frequency: payload.ai_frequency || 'daily',
-            days: payload.ai_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-            prompt: payload.ai_prompt || ''
-          }
-        };
-
-        if (payload.assigneeId) {
-          try {
-            const res = await apiFetch('/api/telegram/send-message', {
-              method: 'POST',
-              body: {
-                profileId: Number(payload.assigneeId),
-                task: taskForMsg,
-                adminEmail: state.currentUser?.email || 'admin@example.com',
-                aiUrl: `${window.location.origin}/ai-assistant`
-              }
-            });
-            if (!res.ok) {
-              console.warn('Telegram message not sent:', res.reason || res.error);
-              // Optional: toast user if res.reason === 'no_chat_id' to ask dev to /start + share phone
-            }
-          } catch (err) {
-            console.warn('Telegram send failed:', err);
           }
         }
 
