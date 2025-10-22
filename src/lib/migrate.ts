@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_project  ON public.tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON public.tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status   ON public.tasks(status);
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 `;
 
 export async function ensureSchema() {
