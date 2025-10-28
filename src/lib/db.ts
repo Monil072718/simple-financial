@@ -1,34 +1,50 @@
-// src/lib/db.ts
-import { Pool } from "pg";
+// src/app/api/auth/login/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { verifyPassword } from "@/lib/users";
+import { z } from "zod";
+import jwt, { SignOptions } from "jsonwebtoken";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
+export const runtime = "nodejs";
+
+const LoginSchema = z.object({
+  email: z.string().email("Valid email required"),
+  password: z.string().min(1, "Password required"),
 });
 
-export type QueryResultSafe<T = unknown> = { rows: T[]; rowCount: number };
+export async function POST(req: NextRequest) {
+  const body: unknown = await req.json().catch(() => ({}));
+  const parsed = LoginSchema.safeParse(body);
 
-// Safe for SELECT/INSERT/UPDATE etc. (normalizes rows/rowCount)
-export async function query<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<QueryResultSafe<T>> {
-  const res = await pool.query(text, params);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
 
-  const rows: T[] = Array.isArray(res?.rows) ? (res.rows as T[]) : [];
-  const rowCount: number =
-    typeof res?.rowCount === "number" ? res.rowCount : rows.length;
+  const { email, password } = parsed.data;
 
-  return { rows, rowCount };
-}
+  try {
+    const user = await verifyPassword(email, password);
+    if (!user) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
 
-// Use this for DDL or when you don't need rows
-export async function exec(text: string, params?: unknown[]): Promise<void> {
-  await pool.query(text, params);
-}
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET missing");
+      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+    }
 
-// Optional
-export async function ping() {
-  const r = await query<{ now: string }>("SELECT NOW() AS now");
-  return r.rows[0]?.now;
+    const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
+    const token = jwt.sign({ sub: user.id, email: user.email }, secret, { expiresIn } as SignOptions);
+
+    return NextResponse.json(
+      {
+        token,
+        user, // ensure verifyPassword returns a safe shape (no password hash)
+      },
+      { status: 200 }
+    );
+  } catch (e) {
+    console.error("[POST /api/auth/login] error:", e);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
