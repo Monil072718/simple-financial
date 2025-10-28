@@ -16,31 +16,23 @@ export async function GET(
 }
 
 // PATCH /api/tasks/:id
-export async function PATCH(
-  req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
 
-  // Read raw body
   const raw = await req.json().catch(() => ({} as Record<string, unknown>));
 
-  // No coercion needed - all statuses are now supported in the database
-  // const coerceStatus = (s: any) => {
-  //   if (s == null) return s;
-  //   const v = String(s).toLowerCase();
-  //   if (v === "pending" || v === "assigned") return "todo";
-  //   return v;
-  // };
-  // if ("status" in raw) raw.status = coerceStatus(raw.status);
+  // ✅ Map legacy/external statuses to ones your DB accepts
+  const coerceStatus = (s: unknown) => {
+    if (s == null) return s;
+    const v = String(s).toLowerCase();
+    if (v === "pending" || v === "assigned") return "todo";
+    return v;
+  };
+  if ("status" in raw) (raw as any).status = coerceStatus((raw as any).status);
 
-  // Validate after coercion
   const parsed = taskUpdateSchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.flatten() },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
   const task = await updateTask(Number(id), parsed.data);

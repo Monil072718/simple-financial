@@ -1,34 +1,35 @@
 // src/lib/db.ts
 import { Pool } from "pg";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
-});
-
-export type QueryResultSafe<T = unknown> = { rows: T[]; rowCount: number };
-
-// Safe for SELECT/INSERT/UPDATE etc. (normalizes rows/rowCount)
-export async function query<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<QueryResultSafe<T>> {
-  const res = await pool.query(text, params);
-
-  const rows: T[] = Array.isArray(res?.rows) ? (res.rows as T[]) : [];
-  const rowCount: number =
-    typeof res?.rowCount === "number" ? res.rowCount : rows.length;
-
-  return { rows, rowCount };
+declare global {
+  // eslint-disable-next-line no-var
+  var __pgPool: Pool | undefined;
 }
 
-// Use this for DDL or when you don't need rows
-export async function exec(text: string, params?: unknown[]): Promise<void> {
+function makePool() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not defined");
+  return new Pool({
+    connectionString: url,
+    ssl: { rejectUnauthorized: false },
+    max: 5,
+    idleTimeoutMillis: 30000,
+  });
+}
+
+export const pool = global.__pgPool ?? makePool();
+if (process.env.NODE_ENV !== "production") global.__pgPool = pool;
+
+export async function query<T = any>(text: string, params?: any[]) {
+  const res = await pool.query(text, params);
+  return { rows: res.rows as T[], rowCount: res.rowCount };
+}
+
+export async function exec(text: string, params?: any[]) {
   await pool.query(text, params);
 }
 
-// Optional
 export async function ping() {
-  const r = await query<{ now: string }>("SELECT NOW() AS now");
-  return r.rows[0]?.now;
+  const { rows } = await pool.query<{ now: string }>("SELECT NOW() AS now");
+  return rows[0]?.now;
 }
