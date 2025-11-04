@@ -7,9 +7,9 @@ export const runtime = "nodejs";
 // GET /api/tasks/:id
 export async function GET(
   _: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   const task = await getTask(Number(id));
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(task);
@@ -18,9 +18,9 @@ export async function GET(
 // PATCH /api/tasks/:id
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
 
   // Read raw body
   const raw = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -51,9 +51,9 @@ export async function PATCH(
 // DELETE /api/tasks/:id
 export async function DELETE(
   _: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   await deleteTask(Number(id));
   return NextResponse.json({ ok: true });
 }

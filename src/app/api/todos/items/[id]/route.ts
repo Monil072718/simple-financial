@@ -5,9 +5,9 @@ import { getUserId } from "@/lib/getUser";
 export const runtime = "nodejs";
 
 // PATCH /api/todos/items/:id
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ownerId = getUserId(req);
-  const { id: idParam } = params;
+  const { id: idParam } = await params;
   const id = Number(idParam);
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
 
@@ -43,9 +43,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/todos/items/:id
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ownerId = getUserId(req);
-  const { id: idParam } = params;
+  const { id: idParam } = await params;
   const id = Number(idParam);
   const res = db().prepare(`DELETE FROM todo_items WHERE id = ? AND ownerId = ?`).run(id, ownerId);
   if (res.changes === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });

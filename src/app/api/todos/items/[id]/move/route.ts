@@ -5,9 +5,9 @@ import { createTask } from "@/lib/tasks";
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   const itemId = Number(id);
   if (!itemId)
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });

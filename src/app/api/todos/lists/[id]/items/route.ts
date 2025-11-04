@@ -5,8 +5,8 @@ import { getUserId } from "@/lib/getUser";
 export const runtime = "nodejs";
 
 // Helper to read and validate the dynamic :id
-function readListId(params: { id: string }) {
-  const { id } = params;
+async function readListId(params: Promise<{ id: string }>) {
+  const { id } = await params;
   const listId = Number(id);
   if (!Number.isFinite(listId) || listId <= 0) {
     throw new Error("Invalid list id");
@@ -17,11 +17,11 @@ function readListId(params: { id: string }) {
 // GET /api/todos/lists/:id/items
 export async function GET(
   req: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const ownerId = getUserId(req);
-    const listId = readListId(ctx.params);
+    const listId = await readListId(ctx.params);
 
     const rows = db()
       .prepare(
@@ -50,7 +50,7 @@ export async function GET(
 // POST /api/todos/lists/:id/items
 export async function POST(
   req: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const body: TodoItemPayload = await req.json().catch(() => ({} as Record<string, unknown>));
@@ -61,7 +61,7 @@ export async function POST(
     const ownerId = getUserId(req);
     const d = db();
     const ts = nowISO();
-    const listId = readListId(ctx.params);
+    const listId = await readListId(ctx.params);
 
     const priority = (body.priority || "Medium") as
       | "Low"

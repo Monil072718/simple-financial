@@ -5,8 +5,9 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const id = Number(params.id);
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   const user = await getUser(id);
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(user);
@@ -18,8 +19,9 @@ const patchSchema = z.object({
   password: z.string().min(8).optional() // << added
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const id = Number(params.id);
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   const body = await req.json().catch(() => ({}));
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
@@ -32,8 +34,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(user);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const id = Number(params.id);
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params;
+  const id = Number(idParam);
   await deleteUser(id);
   return NextResponse.json({ ok: true });
 }

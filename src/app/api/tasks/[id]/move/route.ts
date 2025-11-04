@@ -4,13 +4,13 @@ import { getAuthUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id } = ctx.params;
+    const { id } = await ctx.params;
     const taskId = Number(id);
     if (!taskId) return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
 
