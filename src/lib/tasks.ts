@@ -160,7 +160,7 @@ async function afterAssignNotify(assigneeId: number, task: Record<string, unknow
   // Convert null name to undefined to match ProfileLite type
   const profile = {
     ...profileRaw,
-    name: profileRaw.name ?? undefined,
+    name: profileRaw.full_name ?? undefined,
   };
 
   await sendTaskAssignedMsg(
