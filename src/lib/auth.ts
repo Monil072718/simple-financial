@@ -1,5 +1,5 @@
 // src/lib/auth.ts
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { NextRequest } from "next/server";
 
 export type AuthUser = { id: number; email: string };
@@ -21,7 +21,7 @@ export function verifyAuth(headerAuth?: string): AuthUser | null {
 
     // decoded is JwtPayload; pull fields safely
     const sub = decoded.sub;               // string | number | undefined
-    const email = (decoded as any).email;  // JwtPayload is indexable
+    const email = (decoded as { email?: string }).email;  // JwtPayload is indexable
 
     if (sub == null || !email) return null;
 

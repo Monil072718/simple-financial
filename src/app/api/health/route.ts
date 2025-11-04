@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { pool, query } from "@/lib/db";   // <-- this import triggers db.ts
+import { query } from "@/lib/db";
 import { ensureSchema } from "@/lib/migrate";
 
 export const runtime = "nodejs";

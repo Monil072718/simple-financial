@@ -36,10 +36,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Build dynamic SET list
   const sets: string[] = [];
-  const vals: any[] = [];
+  const vals: unknown[] = [];
   let idx = 1;
 
-  const push = (sql: string, v: any) => { sets.push(`${sql} = $${++idx}`); vals.push(v); };
+  const push = (sql: string, v: unknown) => { sets.push(`${sql} = $${++idx}`); vals.push(v); };
 
   if (parsed.data.title !== undefined) push("title", parsed.data.title);
   if (parsed.data.description !== undefined) push("description", parsed.data.description);

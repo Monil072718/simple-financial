@@ -19,7 +19,7 @@ export async function listTasks({
 }) {
   const offset = (page - 1) * limit;
   const wh: string[] = [];
-  const params: any[] = [];
+  const params: unknown[] = [];
   
   // Filter by user's projects
   if (userId) {
@@ -48,7 +48,7 @@ export async function listTasks({
   return rows;
 }
 
-export async function createTask(data: any) {
+export async function createTask(data: Record<string, unknown>) {
   // Check for duplicate task titles in the same project (only if not moving from todo)
   if (!data._isFromTodo) {
     const { rows: existingTasks } = await query(
@@ -98,7 +98,7 @@ export async function getTask(id: number) {
   return rows[0] ?? null;
 }
 
-export async function updateTask(id: number, data: any) {
+export async function updateTask(id: number, data: Record<string, unknown>) {
   const assigneeProvided =
     Object.prototype.hasOwnProperty.call(data, "assigneeId");
 
@@ -152,7 +152,8 @@ export async function deleteTask(id: number) {
   await query("DELETE FROM tasks WHERE id=$1", [id]);
   return true;
 }
-async function afterAssignNotify(assigneeId: number, task: any, project: any) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function afterAssignNotify(assigneeId: number, task: Record<string, unknown>, project: Record<string, unknown>) {
   const profileRaw = await getProfileLiteById(assigneeId);
   if (!profileRaw) return;
 

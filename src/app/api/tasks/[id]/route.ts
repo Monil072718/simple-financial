@@ -7,9 +7,9 @@ export const runtime = "nodejs";
 // GET /api/tasks/:id
 export async function GET(
   _: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: { id: string } }
 ) {
-  const { id } = await ctx.params;
+  const { id } = ctx.params;
   const task = await getTask(Number(id));
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(task);
@@ -18,12 +18,12 @@ export async function GET(
 // PATCH /api/tasks/:id
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: { id: string } }
 ) {
-  const { id } = await ctx.params;
+  const { id } = ctx.params;
 
   // Read raw body
-  const raw = await req.json().catch(() => ({} as any));
+  const raw = await req.json().catch(() => ({} as Record<string, unknown>));
 
   // No coercion needed - all statuses are now supported in the database
   // const coerceStatus = (s: any) => {
@@ -51,9 +51,9 @@ export async function PATCH(
 // DELETE /api/tasks/:id
 export async function DELETE(
   _: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: { id: string } }
 ) {
-  const { id } = await ctx.params;
+  const { id } = ctx.params;
   await deleteTask(Number(id));
   return NextResponse.json({ ok: true });
 }

@@ -118,7 +118,7 @@ export async function startBot() {
     }
 
     g.__botStarted = true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (String(error?.response?.error_code) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
@@ -133,7 +133,7 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: any) {
+export async function handleTelegramUpdate(update: Record<string, unknown>) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
@@ -188,6 +188,7 @@ function fmt(s?: string) {
 }
 
 // Keep escapeMd around in case you switch back to Markdown later
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function escapeMd(text: string) {
   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }
@@ -199,7 +200,7 @@ export async function sendTaskAssignedMsg(
   task: TaskMsg,
   adminEmail: string,
   aiUrl?: string
-): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
+): Promise<{ ok: boolean; reason?: string; error?: unknown; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
     if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
@@ -240,11 +241,11 @@ export async function sendTaskAssignedMsg(
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: any[] = [];
+    const inline_keyboard: Array<Array<{ text: string; url: string }>> = [];
     if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
     // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    const opts: any = {
+    const opts: { parse_mode: string; reply_markup?: { inline_keyboard: Array<Array<{ text: string; url: string }>> } } = {
       parse_mode: 'Markdown'
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
@@ -255,14 +256,14 @@ export async function sendTaskAssignedMsg(
     try {
       const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
-    } catch (err: any) {
-      const code = err?.response?.error_code;
-      const desc = String(err?.response?.description || "");
+    } catch (err: unknown) {
+      const code = (err as { response?: { error_code?: number } })?.response?.error_code;
+      const desc = String((err as { response?: { description?: string } })?.response?.description || "");
       console.error("Telegram sendMessage failed:", { code, desc });
 
       if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
       if (code === 403) return { ok: false, reason: "user_blocked_bot" };
-      return { ok: false, error: err?.response || err };
+      return { ok: false, error: (err as { response?: unknown })?.response || err };
     }
   } catch (error) {
     console.error("Unexpected error in sendTaskAssignedMsg:", error);

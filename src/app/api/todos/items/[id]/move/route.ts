@@ -5,14 +5,15 @@ import { createTask } from "@/lib/tasks";
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: { id: string } }
 ) {
-  const { id } = await ctx.params;
+  const { id } = ctx.params;
   const itemId = Number(id);
   if (!itemId)
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });
 
-  const { listId, projectId } = await req.json().catch(() => ({} as any));
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const { listId, projectId } = body;
   if (!listId && !projectId) {
     return NextResponse.json(
       { error: "Provide listId or projectId" },
@@ -26,7 +27,7 @@ export async function POST(
   // 1) Ensure todo exists and belongs to user
   const existing = d
     .prepare("SELECT * FROM todo_items WHERE id = ? AND ownerId = ?")
-    .get(itemId, ownerId) as any | undefined;
+    .get(itemId, ownerId) as Record<string, unknown> | undefined;
 
   if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -40,7 +41,7 @@ export async function POST(
         .prepare(
           "SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?"
         )
-        .get(Number(listId)) as any
+        .get(Number(listId)) as { pos: number }
     ).pos;
 
     d.prepare(
@@ -49,8 +50,8 @@ export async function POST(
 
     const row = d
       .prepare("SELECT * FROM todo_items WHERE id = ?")
-      .get(itemId) as any;
-    row.tags = JSON.parse(row.tags || "[]");
+      .get(itemId) as Record<string, unknown>;
+    row.tags = JSON.parse((row.tags as string) || "[]");
     return NextResponse.json({ todo: row });
   }
 
@@ -63,13 +64,13 @@ export async function POST(
   };
 
   // helpers to sanitize values coming from SQLite
-  const numOrNull = (v: any) => {
+  const numOrNull = (v: unknown) => {
     if (v === null || v === undefined) return null;
     // accept number-like strings only
     const s = String(v).trim();
     return /^\d+$/.test(s) ? Number(s) : null;
   };
-  const strOrNull = (v: any) => {
+  const strOrNull = (v: unknown) => {
     const s = (v ?? "").toString().trim();
     return s.length ? s : null;
   };
@@ -94,8 +95,8 @@ export async function POST(
 
   const updatedTodo = d
     .prepare("SELECT * FROM todo_items WHERE id = ?")
-    .get(itemId) as any;
-  updatedTodo.tags = JSON.parse(updatedTodo.tags || "[]");
+    .get(itemId) as Record<string, unknown>;
+  updatedTodo.tags = JSON.parse((updatedTodo.tags as string) || "[]");
 
   return NextResponse.json(
     { todo: updatedTodo, task: createdTask },

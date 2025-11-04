@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json(rows);
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to fetch milestones", detail: err?.message ?? String(err) },
+      { error: "Failed to fetch milestones", detail: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }
@@ -76,9 +76,9 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json(rows[0], { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to save milestone", detail: err?.message ?? String(err) },
+      { error: "Failed to save milestone", detail: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }

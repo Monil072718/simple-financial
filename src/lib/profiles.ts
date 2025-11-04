@@ -65,7 +65,7 @@ export async function listProfiles(
   }
 
   const offset = (page - 1) * limit;
-  const params: any[] = [];
+  const params: unknown[] = [];
   let where = "";
 
   if (q) {

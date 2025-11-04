@@ -4,17 +4,18 @@ import { getAuthUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: { id: string } }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id } = await ctx.params;
+    const { id } = ctx.params;
     const taskId = Number(id);
     if (!taskId) return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
 
-    const { projectId } = await req.json().catch(() => ({} as any));
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+    const projectId = body.projectId;
     if (!projectId) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
 
     // Verify the task exists and belongs to user's project
@@ -62,9 +63,9 @@ export async function POST(
     );
 
     return NextResponse.json({ task: updatedRows[0] }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to move task", detail: err?.message ?? String(err) },
+      { error: "Failed to move task", detail: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }

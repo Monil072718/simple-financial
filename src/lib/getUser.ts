@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { db, nowISO } from "./todos.db";
+import { db } from "./todos.db";
 
 export function getUserId(req: NextRequest): string {
   // Try to map onto your existing auth first:

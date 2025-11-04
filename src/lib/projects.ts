@@ -2,7 +2,7 @@ import { query } from "@/lib/db";
 
 export async function listProjects({ q, page=1, limit=10, userId }:{ q?:string; page?:number; limit?:number; userId?:number }) {
   const offset = (page-1)*limit;
-  const params:any[] = [];
+  const params:unknown[] = [];
   const conditions = [];
   
   // Filter by user if provided
@@ -35,7 +35,7 @@ export async function getProjectWithTasks(id:number) {
   return { ...p, tasks };
 }
 
-export async function createProject(data:any) {
+export async function createProject(data: Record<string, unknown>) {
   const { rows } = await query(
     `INSERT INTO projects(name,description,owner_id,status,start_date,due_date)
      VALUES($1,$2,$3,COALESCE($4,'active'),$5,$6)
@@ -45,7 +45,7 @@ export async function createProject(data:any) {
   return rows[0];
 }
 
-export async function updateProject(id:number, data:any) {
+export async function updateProject(id:number, data: Record<string, unknown>) {
   const { rows } = await query(
     `UPDATE projects SET
       name=COALESCE($1,name),
