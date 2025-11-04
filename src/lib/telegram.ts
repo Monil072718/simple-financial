@@ -214,12 +214,13 @@ export async function sendTaskAssignedMsg(
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
     
     // Format priority with emoji
-    const priorityEmoji = {
+    const priorityEmoji: Record<string, string> = {
       'low': '🟢',
       'medium': '🟡', 
       'high': '🔴'
     };
-    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    const priorityKey = task.priority ? task.priority.toLowerCase() : '';
+    const priorityText = task.priority ? `${priorityEmoji[priorityKey] || '🟡'} ${task.priority.toUpperCase()}` : '';
     
     // Format AI communication info
     const aiCommText = task.aiComm?.active ? 
