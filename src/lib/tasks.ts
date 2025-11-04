@@ -166,14 +166,14 @@ async function afterAssignNotify(assigneeId: number, task: Record<string, unknow
   await sendTaskAssignedMsg(
     profile,
     {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      startDate: task.start_date,
-      endDate: task.end_date,
-      projectName: project?.name,
+      id: task.id as number,
+      title: task.title as string,
+      description: task.description as string | undefined,
+      startDate: task.start_date as string | undefined,
+      endDate: task.end_date as string | undefined,
+      projectName: project?.name as string | undefined,
     },
     'patelmonil1807@gmail.com',
-    `${process.env.PUBLIC_URL}/ai?taskId=${task.id}` // your AI page
+    `${process.env.PUBLIC_URL}/ai?taskId=${task.id as number}` // your AI page
   );
 }
