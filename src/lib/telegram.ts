@@ -122,7 +122,8 @@ export async function startBot() {
 
     g.__botStarted = true;
   } catch (error: unknown) {
-    if (String(error?.response?.error_code) === "409") {
+    const errorCode = (error as { response?: { error_code?: number } })?.response?.error_code;
+    if (String(errorCode) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
