@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword } from "@/lib/users";
 import { z } from "zod";
-import jwt, { SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const token = jwt.sign(
       { sub: user.id, email: user.email }, // minimal claims
       secret,
-      { expiresIn } as SignOptions
+      { algorithm: "HS256", expiresIn }
     );
 
     // Return token + public user (no hash)

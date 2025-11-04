@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (e: unknown) {
-    if ((e as Record<string, unknown>)?.code === "23505") {
+  } catch (e: any) {
+    if (e?.code === "23505") {
       return NextResponse.json({ error: "Email already exists" }, { status: 409 });
     }
     console.error("[POST /api/users] error:", e);

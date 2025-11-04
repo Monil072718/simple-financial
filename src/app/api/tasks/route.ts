@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   // Verify the project belongs to the user
   const { query } = await import("@/lib/db");
   const project = await query("SELECT owner_id FROM projects WHERE id = $1", [parsed.data.projectId]);
-  if (!project.rows.length || (project.rows[0] as Record<string, unknown>).owner_id !== user.id) {
+  if (!project.rows.length || project.rows[0].owner_id !== user.id) {
     return NextResponse.json({ error: "Project not found or access denied" }, { status: 403 });
   }
   
@@ -45,17 +45,17 @@ export async function POST(req: NextRequest) {
       const { query } = await import("@/lib/db");
       
       const profile = await getProfile(parsed.data.assigneeId);
-      if (profile && (profile as Record<string, unknown>).telegram_chat_id) {
+      if (profile && (profile as any).telegram_chat_id) {
         const projectResult = await query("SELECT name FROM projects WHERE id = $1", [parsed.data.projectId]);
-        const projectName = (projectResult.rows[0] as Record<string, unknown>)?.name || "Unknown Project";
+        const projectName = projectResult.rows[0]?.name || "Unknown Project";
         
         const taskMsg = {
-          id: (task as Record<string, unknown>).id as number,
-          title: (task as Record<string, unknown>).title as string,
-          description: (task as Record<string, unknown>).description as string,
-          projectName: projectName as string,
-          priority: (task as Record<string, unknown>).priority as string,
-          endDate: (task as Record<string, unknown>).due_date as string,
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          projectName,
+          priority: task.priority,
+          endDate: task.due_date,
           aiComm: {
             active: false,
             frequency: "daily",
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         const profileLite = {
           id: profile.id,
           name: profile.full_name,
-          telegram_chat_id: (profile as Record<string, unknown>).telegram_chat_id as string | number | null | undefined,
+          telegram_chat_id: (profile as any).telegram_chat_id,
           email: profile.email
         };
         

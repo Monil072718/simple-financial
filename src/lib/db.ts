@@ -1,50 +1,34 @@
-// src/app/api/auth/login/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword } from "@/lib/users";
-import { z } from "zod";
-import jwt, { SignOptions } from "jsonwebtoken";
+// src/lib/db.ts
+import { Pool } from "pg";
 
-export const runtime = "nodejs";
-
-const LoginSchema = z.object({
-  email: z.string().email("Valid email required"),
-  password: z.string().min(1, "Password required"),
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
 
-export async function POST(req: NextRequest) {
-  const body: unknown = await req.json().catch(() => ({}));
-  const parsed = LoginSchema.safeParse(body);
+export type QueryResultSafe<T = any> = { rows: T[]; rowCount: number };
 
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+// Safe for SELECT/INSERT/UPDATE etc. (normalizes rows/rowCount)
+export async function query<T = any>(
+  text: string,
+  params?: any[]
+): Promise<QueryResultSafe<T>> {
+  const res: any = await pool.query(text, params);
 
-  const { email, password } = parsed.data;
+  const rows: T[] = Array.isArray(res?.rows) ? (res.rows as T[]) : [];
+  const rowCount: number =
+    typeof res?.rowCount === "number" ? res.rowCount : rows.length;
 
-  try {
-    const user = await verifyPassword(email, password);
-    if (!user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-    }
+  return { rows, rowCount };
+}
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      console.error("JWT_SECRET missing");
-      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
-    }
+// Use this for DDL or when you don't need rows
+export async function exec(text: string, params?: any[]): Promise<void> {
+  await pool.query(text, params);
+}
 
-    const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
-    const token = jwt.sign({ sub: user.id, email: user.email }, secret, { expiresIn } as SignOptions);
-
-    return NextResponse.json(
-      {
-        token,
-        user, // ensure verifyPassword returns a safe shape (no password hash)
-      },
-      { status: 200 }
-    );
-  } catch (e) {
-    console.error("[POST /api/auth/login] error:", e);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+// Optional
+export async function ping() {
+  const r = await query<{ now: string }>("SELECT NOW() AS now");
+  return r.rows[0]?.now;
 }

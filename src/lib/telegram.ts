@@ -86,17 +86,6 @@ export async function startBot() {
     console.warn("Cannot start Telegram bot: missing token or bot instance");
     return;
   }
-  
-  // Skip bot startup during build processes
-  const isBuildProcess = process.env.NEXT_PHASE === 'phase-production-build' || 
-                        process.env.NEXT_PHASE === 'phase-development-build' ||
-                        process.argv.includes('build');
-  
-  if (isBuildProcess) {
-    console.log("Skipping Telegram bot startup during build process");
-    return;
-  }
-  
   starting = true;
 
   try {
@@ -104,49 +93,14 @@ export async function startBot() {
 
     // Build webhook URL (prod only)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
-    
-    if (isProd && bot) {
-      // Validate webhook URL configuration
-      if (!baseUrl) {
-        console.error("Missing APP_URL or PUBLIC_URL environment variable for production webhook");
-        console.error("Please set APP_URL or PUBLIC_URL in your environment variables");
-        throw new Error("Missing APP_URL or PUBLIC_URL environment variable");
-      }
-      
-      if (!process.env.TG_WEBHOOK_SECRET) {
-        console.error("Missing TG_WEBHOOK_SECRET environment variable");
-        console.error("Please set TG_WEBHOOK_SECRET in your environment variables");
-        throw new Error("Missing TG_WEBHOOK_SECRET environment variable");
-      }
-      
-      // Validate URL format
-      try {
-        const url = new URL(baseUrl);
-        if (url.protocol !== 'https:') {
-          console.error("Webhook URL must use HTTPS protocol:", baseUrl);
-          throw new Error("Webhook URL must use HTTPS protocol");
-        }
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-          console.error("Webhook URL cannot use localhost:", baseUrl);
-          throw new Error("Webhook URL cannot use localhost");
-        }
-      } catch (urlError) {
-        console.error("Invalid webhook URL format:", baseUrl, urlError);
-        throw new Error("Invalid webhook URL format");
-      }
-      
-      const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
-      
+    const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
+
+    if (isProd) {
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
-    } else if (bot) {
-      // Dev → polling (skip webhook setup if env vars missing)
-      if (!baseUrl || !process.env.TG_WEBHOOK_SECRET) {
-        console.log("Development mode: Missing webhook env vars, using polling only");
-        console.log("To use webhooks in dev, set APP_URL and TG_WEBHOOK_SECRET");
-      }
-      
+    } else {
+      // Dev → polling
       await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
       await bot.launch({ dropPendingUpdates: true });
@@ -156,7 +110,7 @@ export async function startBot() {
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          if (bot) await bot.stop("SIGTERM");
+          await bot.stop("SIGTERM");
         } catch {}
       };
       process.once("SIGINT", stop);
@@ -164,22 +118,13 @@ export async function startBot() {
     }
 
     g.__botStarted = true;
-  } catch (error: unknown) {
-    const errorCode = (error as { response?: { error_code?: unknown } })?.response?.error_code;
-    const errorDescription = (error as { response?: { description?: unknown } })?.response?.description;
-    
-    if (String(errorCode) === "409") {
+  } catch (error: any) {
+    if (String(error?.response?.error_code) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
           "Tips: close duplicate `next dev`, PM2 workers, Docker containers; or run `/revoke` in @BotFather."
       );
-    } else if (String(errorCode) === "400" && String(errorDescription).includes("bad webhook")) {
-      console.error("Telegram webhook error - check your APP_URL/PUBLIC_URL environment variable:");
-      console.error("- Must be a valid HTTPS URL (not localhost)");
-      console.error("- Must be accessible from the internet");
-      console.error("- Current URL:", process.env.APP_URL || process.env.PUBLIC_URL);
-      console.error("Full error:", error);
     } else {
       console.error("Failed to start Telegram bot:", error);
     }
@@ -188,14 +133,13 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: Record<string, unknown>) {
+export async function handleTelegramUpdate(update: any) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await g.__bot.handleUpdate(update as any);
+    await g.__bot.handleUpdate(update);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
@@ -244,9 +188,9 @@ function fmt(s?: string) {
 }
 
 // Keep escapeMd around in case you switch back to Markdown later
-// function escapeMd(text: string) {
-//   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
-// }
+function escapeMd(text: string) {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+}
 
 /* ----------------------------- Send Task Message ---------------------------- */
 // Plain-text send with conditional inline button (https only). No Markdown fragility.
@@ -255,7 +199,7 @@ export async function sendTaskAssignedMsg(
   task: TaskMsg,
   adminEmail: string,
   aiUrl?: string
-): Promise<{ ok: boolean; reason?: string; error?: unknown; message_id?: number }> {
+): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
     if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
@@ -269,7 +213,7 @@ export async function sendTaskAssignedMsg(
       'medium': '🟡', 
       'high': '🔴'
     };
-    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase() as keyof typeof priorityEmoji] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
     
     // Format AI communication info
     const aiCommText = task.aiComm?.active ? 
@@ -296,11 +240,11 @@ export async function sendTaskAssignedMsg(
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: Array<Array<{ text: string; url: string }>> = [];
+    const inline_keyboard: any[] = [];
     if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
     // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    const opts: Record<string, unknown> = {
+    const opts: any = {
       parse_mode: 'Markdown'
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
@@ -309,16 +253,16 @@ export async function sendTaskAssignedMsg(
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
-      const msg = await g.__bot!.telegram.sendMessage(chatId, textLines, opts);
+      const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
-    } catch (err: unknown) {
-      const code = (err as { response?: { error_code?: unknown } })?.response?.error_code;
-      const desc = String((err as { response?: { description?: unknown } })?.response?.description || "");
+    } catch (err: any) {
+      const code = err?.response?.error_code;
+      const desc = String(err?.response?.description || "");
       console.error("Telegram sendMessage failed:", { code, desc });
 
       if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
       if (code === 403) return { ok: false, reason: "user_blocked_bot" };
-      return { ok: false, error: (err as { response?: unknown })?.response || err };
+      return { ok: false, error: err?.response || err };
     }
   } catch (error) {
     console.error("Unexpected error in sendTaskAssignedMsg:", error);
@@ -356,14 +300,4 @@ async function linkTelegramToProfile(
 }
 
 /* -------------------------- Autostart in this process ----------------------- */
-// Only start bot if we have a token and we're not in a build environment
-if (token && typeof window === 'undefined') {
-  // Check if we're in a build process by looking for build-specific env vars
-  const isBuildProcess = process.env.NEXT_PHASE === 'phase-production-build' || 
-                        process.env.NEXT_PHASE === 'phase-development-build' ||
-                        process.argv.includes('build');
-  
-  if (!isBuildProcess) {
-    startBot().catch(console.error);
-  }
-}
+startBot().catch(console.error);

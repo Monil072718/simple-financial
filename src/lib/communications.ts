@@ -49,13 +49,13 @@ export async function upsertSchedule(input: {
        prompt=EXCLUDED.prompt,
        updated_at=NOW()
      RETURNING id, user_id, task_id, active, frequency, days, prompt, created_at, updated_at`,
-    [input.userId, input.taskId, input.active ?? false, input.frequency ?? 'daily', (input.days ?? []) as string[], input.prompt ?? null]
+    [input.userId, input.taskId, input.active ?? false, input.frequency ?? 'daily', (input.days ?? []) as any[], input.prompt ?? null]
   );
   return rows[0];
 }
 
 export async function listSchedules(opts: { userId: number; projectId?: number }) {
-  const params: unknown[] = [opts.userId];
+  const params: any[] = [opts.userId];
   let where = `WHERE cs.user_id = $1`;
   if (opts.projectId) {
     params.push(opts.projectId);
@@ -74,7 +74,7 @@ export async function listSchedules(opts: { userId: number; projectId?: number }
 }
 
 export async function listLogs(opts: { userId: number; projectId?: number; limit?: number }) {
-  const params: unknown[] = [opts.userId];
+  const params: any[] = [opts.userId];
   let where = `WHERE cl.user_id = $1`;
   if (opts.projectId) {
     params.push(opts.projectId);

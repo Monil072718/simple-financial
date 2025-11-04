@@ -13,11 +13,11 @@ const updateSchema = z.object({
   difficulty: z.enum(["Easy", "Medium", "Hard"]).optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = await params;
+  const id = Number(params.id);
   const json = await req.json().catch(() => ({}));
   const parsed = updateSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -30,16 +30,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
      WHERE m.id = $1`,
     [id]
   );
-  const ms = msRows[0] as Record<string, unknown>;
+  const ms = msRows[0];
   if (!ms) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if ((ms.owner_email as string) !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (ms.owner_email !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // Build dynamic SET list
   const sets: string[] = [];
-  const vals: unknown[] = [];
+  const vals: any[] = [];
   let idx = 1;
 
-  const push = (sql: string, v: unknown) => { sets.push(`${sql} = $${++idx}`); vals.push(v); };
+  const push = (sql: string, v: any) => { sets.push(`${sql} = $${++idx}`); vals.push(v); };
 
   if (parsed.data.title !== undefined) push("title", parsed.data.title);
   if (parsed.data.description !== undefined) push("description", parsed.data.description);
@@ -73,11 +73,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = await params;
+  const id = Number(params.id);
 
   // Ownership check
   const { rows: msRows } = await query(
@@ -87,9 +87,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
      WHERE m.id = $1`,
     [id]
   );
-  const ms = msRows[0] as Record<string, unknown>;
+  const ms = msRows[0];
   if (!ms) return NextResponse.json({ ok: true });
-  if ((ms.owner_email as string) !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (ms.owner_email !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await query("DELETE FROM milestones WHERE id = $1", [id]);
   return NextResponse.json({ ok: true });
