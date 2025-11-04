@@ -1,5 +1,5 @@
 // src/lib/telegram.ts
-import { Telegraf, Markup } from "telegraf";
+import { Telegraf, Markup, type Update } from "telegraf";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -137,7 +137,7 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: Record<string, unknown>) {
+export async function handleTelegramUpdate(update: Update) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
