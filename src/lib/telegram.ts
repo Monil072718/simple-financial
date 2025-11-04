@@ -1,5 +1,5 @@
 // src/lib/telegram.ts
-import { Telegraf, Markup, type Update } from "telegraf";
+import { Telegraf, Markup } from "telegraf";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -137,13 +137,14 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: Update) {
+export async function handleTelegramUpdate(update: unknown) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
-    await g.__bot.handleUpdate(update);
+    // Type assertion needed because telegraf Update type is not exported
+    await g.__bot.handleUpdate(update as Parameters<typeof g.__bot.handleUpdate>[0]);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
