@@ -90,27 +90,30 @@ export async function startBot() {
 
   try {
     const isProd = process.env.NODE_ENV === "production";
+    
+    // g.__bot is guaranteed to exist here due to check above
+    const botInstance = g.__bot!;
 
     // Build webhook URL (prod only)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
     const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
 
     if (isProd) {
-      await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-      await bot.telegram.setWebhook(webhookUrl);
+      await botInstance.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+      await botInstance.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
     } else {
       // Dev → polling
-      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
-      await bot.launch({ dropPendingUpdates: true });
+      await botInstance.launch({ dropPendingUpdates: true });
       console.log("Telegram bot started with polling");
     }
 
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          await bot.stop("SIGTERM");
+          await botInstance.stop("SIGTERM");
         } catch {}
       };
       process.once("SIGINT", stop);
@@ -254,7 +257,8 @@ export async function sendTaskAssignedMsg(
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
-      const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
+      if (!g.__bot) return { ok: false, reason: "bot_not_configured" };
+      const msg = await g.__bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
     } catch (err: unknown) {
       const code = (err as { response?: { error_code?: number } })?.response?.error_code;
