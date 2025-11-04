@@ -1,5 +1,6 @@
 // src/lib/telegram.ts
 import { Telegraf, Markup } from "telegraf";
+import type { InlineKeyboardMarkup, ParseMode } from "typegram";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -90,18 +91,24 @@ export async function startBot() {
 
   try {
     const isProd = process.env.NODE_ENV === "production";
-    
-    // g.__bot is guaranteed to exist here due to check above
     const botInstance = g.__bot!;
 
     // Build webhook URL (prod only)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
-    const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
+    const webhookUrl = baseUrl
+      ? `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`
+      : undefined;
 
     if (isProd) {
-      await botInstance.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-      await botInstance.telegram.setWebhook(webhookUrl);
-      console.log("Telegram webhook configured:", webhookUrl);
+      try {
+        await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
+      } catch {}
+      if (webhookUrl) {
+        await botInstance.telegram.setWebhook(webhookUrl);
+        console.log("Telegram webhook configured:", webhookUrl);
+      } else {
+        console.warn("No APP_URL/PUBLIC_URL set; cannot configure Telegram webhook.");
+      }
     } else {
       // Dev → polling
       await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
@@ -143,7 +150,6 @@ export async function handleTelegramUpdate(update: unknown) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
-    // Type assertion needed because telegraf Update type is not exported
     await g.__bot.handleUpdate(update as Parameters<typeof g.__bot.handleUpdate>[0]);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
@@ -212,51 +218,58 @@ export async function sendTaskAssignedMsg(
     if (!g.__botStarted) await startBot();
 
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
-    
+
     // Format priority with emoji
     const priorityEmoji: Record<string, string> = {
-      'low': '🟢',
-      'medium': '🟡', 
-      'high': '🔴'
+      low: "🟢",
+      medium: "🟡",
+      high: "🔴",
     };
-    const priorityKey = task.priority ? task.priority.toLowerCase() : '';
-    const priorityText = task.priority ? `${priorityEmoji[priorityKey] || '🟡'} ${task.priority.toUpperCase()}` : '';
-    
+    const priorityKey = task.priority ? task.priority.toLowerCase() : "";
+    const priorityText = task.priority
+      ? `${priorityEmoji[priorityKey] || "🟡"} ${task.priority.toUpperCase()}`
+      : "";
+
     // Format AI communication info
-    const aiCommText = task.aiComm?.active ? 
-      `\n🤖 AI Communication: ${task.aiComm.frequency || 'daily'}${task.aiComm.days ? ` (${task.aiComm.days.join(', ')})` : ''}` : '';
-    
+    const aiCommText = task.aiComm?.active
+      ? `\n🤖 AI Communication: ${task.aiComm.frequency || "daily"}${
+          task.aiComm.days ? ` (${task.aiComm.days.join(", ")})` : ""
+        }`
+      : "";
+
     const textLines = [
       "🆕 *NEW TASK ASSIGNED*",
       "",
       `📋 *${task.title}*`,
-      task.description ? `\n📝 ${task.description.slice(0, 500)}` : '',
-      task.projectName ? `\n🏢 Project: ${task.projectName}` : '',
-      priorityText ? `\n${priorityText}` : '',
-      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : '',
-      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : '',
+      task.description ? `\n📝 ${task.description.slice(0, 500)}` : "",
+      task.projectName ? `\n🏢 Project: ${task.projectName}` : "",
+      priorityText ? `\n${priorityText}` : "",
+      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : "",
+      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : "",
       aiCommText,
-      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : '',
+      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : "",
       "",
       "─".repeat(20),
-      aiBtnAllowed
-        ? "💡 Need help? Tap 'Ask AI' below or email admin"
-        : `💡 Questions? Email: ${adminEmail}`,
-      aiBtnAllowed ? "" : (aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : ""),
+      aiBtnAllowed ? "💡 Need help? Tap 'Ask AI' below or email admin" : `💡 Questions? Email: ${adminEmail}`,
+      aiBtnAllowed ? "" : aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: Array<Array<{ text: string; url: string }>> = [];
-    if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
-    // No mailto button; Telegram inline button URLs must be http/https/tg.
+    const inline_keyboard: InlineKeyboardMarkup["inline_keyboard"] = [];
+    if (aiBtnAllowed && aiUrl) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl }]);
 
-    const opts: { parse_mode: string; reply_markup?: { inline_keyboard: Array<Array<{ text: string; url: string }>> } } = {
-      parse_mode: 'Markdown'
+    // Properly typed options for Telegraf / Telegram API
+    const PARSE_MODE: ParseMode = "Markdown";
+    const opts: { parse_mode?: ParseMode; reply_markup?: InlineKeyboardMarkup } = {
+      parse_mode: PARSE_MODE,
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
 
-    const chatId = String(profile.telegram_chat_id).trim();
+    // chat_id can be string | number; preserve type and trim strings safely
+    let chatId: number | string = profile.telegram_chat_id!;
+    if (typeof chatId === "string") chatId = chatId.trim();
+
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
