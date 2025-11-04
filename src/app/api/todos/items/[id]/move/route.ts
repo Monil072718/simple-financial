@@ -75,13 +75,14 @@ export async function POST(
     return s.length ? s : null;
   };
 
+  const priorityKey = typeof existing.priority === "string" ? existing.priority : "Medium";
   const taskPayload = {
     projectId: Number(projectId), // already validated earlier
     title: existing.content,
     description: strOrNull(existing.description),
     assigneeId: numOrNull(existing.assigneeId), // <- avoid NaN
     status: "todo",
-    priority: priorityMap[existing.priority || "Medium"] || "medium",
+    priority: priorityMap[priorityKey] || "medium",
     dueDate: strOrNull(existing.dueDate), // '' -> null
     _isFromTodo: true, // Flag to indicate this is from todo item
   };
