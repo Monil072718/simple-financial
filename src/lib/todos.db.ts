@@ -1,10 +1,20 @@
-import Database from "better-sqlite3";
+// src/lib/todos.db.ts
 import path from "path";
 import fs from "fs";
 
-let _db: Database.Database | null = null;
+/**
+ * Minimal shape we need from better-sqlite3's Database.
+ * (Avoids depending on @types/better-sqlite3 for builds.)
+ */
+type SqliteDB = {
+  exec(sql: string): unknown;
+  pragma(setting: string): unknown;
+};
 
-function ensureTodoSchema(d: Database.Database) {
+// Hold a single process-wide instance
+let _db: SqliteDB | null = null;
+
+function ensureTodoSchema(d: SqliteDB) {
   // Only SQLite-safe DDL for the To-Do module
   d.exec(`
     PRAGMA foreign_keys = ON;
@@ -46,22 +56,35 @@ function ensureTodoSchema(d: Database.Database) {
   `);
 }
 
-export function db() {
+export function db(): SqliteDB {
   if (_db) return _db;
 
-  const dbDir = path.join(process.cwd(), "db");
-  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+  // Use require() so TS treats the module as any (no type defs needed)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const BetterSqlite3 = require("better-sqlite3") as any;
 
-  const dbPath = path.join(dbDir, "nexusflow.sqlite");
-  _db = new Database(dbPath);
+  // On serverless platforms (e.g., Vercel), writable disk is not guaranteed.
+  // Fallback to in-memory DB to avoid runtime crashes.
+  const isServerless = !!process.env.VERCEL || process.env.NEXT_RUNTIME === "edge";
 
-  _db.pragma("journal_mode = WAL");
-  _db.pragma("foreign_keys = ON");
+  let dbPath: string;
+  if (isServerless) {
+    dbPath = ":memory:";
+  } else {
+    const dbDir = path.join(process.cwd(), "db");
+    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+    dbPath = path.join(dbDir, "nexusflow.sqlite");
+  }
 
-  // Create ONLY the To-Do schema (ignore global database.sql to avoid CREATE EXTENSION errors)
-  ensureTodoSchema(_db);
+  const instance: SqliteDB = new BetterSqlite3(dbPath);
+  instance.pragma("journal_mode = WAL");
+  instance.pragma("foreign_keys = ON");
 
-  return _db!;
+  // Create ONLY the To-Do schema (avoid any CREATE EXTENSION etc.)
+  ensureTodoSchema(instance);
+
+  _db = instance;
+  return _db;
 }
 
 export type TodoItemPayload = {
