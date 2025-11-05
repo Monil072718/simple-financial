@@ -7,9 +7,17 @@ import fs from "fs";
  * Minimal shape we need from better-sqlite3's Database.
  * (Avoids depending on @types/better-sqlite3 for builds.)
  */
+type PreparedStatement = {
+  get(...params: unknown[]): unknown;
+  run(...params: unknown[]): { changes: number; lastInsertRowid?: number };
+  all(...params: unknown[]): unknown[];
+};
+
 type SqliteDB = {
   exec(sql: string): unknown;
   pragma(setting: string): unknown;
+  prepare(sql: string): PreparedStatement;
+  transaction(fn: () => void): () => void;
 };
 
 // Hold a single process-wide instance
