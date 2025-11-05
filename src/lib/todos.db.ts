@@ -1,4 +1,5 @@
-// src/lib/todos.db.ts
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
+
 import path from "path";
 import fs from "fs";
 
@@ -59,8 +60,8 @@ function ensureTodoSchema(d: SqliteDB) {
 export function db(): SqliteDB {
   if (_db) return _db;
 
-  // Use require() so TS treats the module as any (no type defs needed)
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // Use require() so TS doesn't need type defs for better-sqlite3
+  // (ES import would require @types/better-sqlite3 or a manual module declaration.)
   const BetterSqlite3 = require("better-sqlite3") as any;
 
   // On serverless platforms (e.g., Vercel), writable disk is not guaranteed.
