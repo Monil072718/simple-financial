@@ -3,8 +3,6 @@ import { db, nowISO } from "@/lib/todos.db";
 import { getUserId } from "@/lib/getUser";
 import { createTask } from "@/lib/tasks";
 
-export const runtime = "nodejs";
-
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
@@ -14,8 +12,7 @@ export async function POST(
   if (!itemId)
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });
 
-  const body = await req.json().catch(() => ({} as Record<string, unknown>));
-  const { listId, projectId } = body;
+  const { listId, projectId } = await req.json().catch(() => ({} as any));
   if (!listId && !projectId) {
     return NextResponse.json(
       { error: "Provide listId or projectId" },
@@ -29,7 +26,7 @@ export async function POST(
   // 1) Ensure todo exists and belongs to user
   const existing = d
     .prepare("SELECT * FROM todo_items WHERE id = ? AND ownerId = ?")
-    .get(itemId, ownerId) as Record<string, unknown> | undefined;
+    .get(itemId, ownerId) as any | undefined;
 
   if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -43,7 +40,7 @@ export async function POST(
         .prepare(
           "SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?"
         )
-        .get(Number(listId)) as { pos: number }
+        .get(Number(listId)) as any
     ).pos;
 
     d.prepare(
@@ -52,8 +49,8 @@ export async function POST(
 
     const row = d
       .prepare("SELECT * FROM todo_items WHERE id = ?")
-      .get(itemId) as Record<string, unknown>;
-    row.tags = JSON.parse((row.tags as string) || "[]");
+      .get(itemId) as any;
+    row.tags = JSON.parse(row.tags || "[]");
     return NextResponse.json({ todo: row });
   }
 
@@ -66,25 +63,24 @@ export async function POST(
   };
 
   // helpers to sanitize values coming from SQLite
-  const numOrNull = (v: unknown) => {
+  const numOrNull = (v: any) => {
     if (v === null || v === undefined) return null;
     // accept number-like strings only
     const s = String(v).trim();
     return /^\d+$/.test(s) ? Number(s) : null;
   };
-  const strOrNull = (v: unknown) => {
+  const strOrNull = (v: any) => {
     const s = (v ?? "").toString().trim();
     return s.length ? s : null;
   };
 
-  const priorityKey = typeof existing.priority === "string" ? existing.priority : "Medium";
   const taskPayload = {
     projectId: Number(projectId), // already validated earlier
     title: existing.content,
     description: strOrNull(existing.description),
     assigneeId: numOrNull(existing.assigneeId), // <- avoid NaN
     status: "todo",
-    priority: priorityMap[priorityKey] || "medium",
+    priority: priorityMap[existing.priority || "Medium"] || "medium",
     dueDate: strOrNull(existing.dueDate), // '' -> null
     _isFromTodo: true, // Flag to indicate this is from todo item
   };
@@ -98,8 +94,8 @@ export async function POST(
 
   const updatedTodo = d
     .prepare("SELECT * FROM todo_items WHERE id = ?")
-    .get(itemId) as Record<string, unknown>;
-  updatedTodo.tags = JSON.parse((updatedTodo.tags as string) || "[]");
+    .get(itemId) as any;
+  updatedTodo.tags = JSON.parse(updatedTodo.tags || "[]");
 
   return NextResponse.json(
     { todo: updatedTodo, task: createdTask },

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 
-export const runtime = "nodejs";
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
@@ -15,8 +14,7 @@ export async function POST(
     const taskId = Number(id);
     if (!taskId) return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
 
-    const body = await req.json().catch(() => ({} as Record<string, unknown>));
-    const projectId = body.projectId;
+    const { projectId } = await req.json().catch(() => ({} as any));
     if (!projectId) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
 
     // Verify the task exists and belongs to user's project
@@ -64,9 +62,9 @@ export async function POST(
     );
 
     return NextResponse.json({ task: updatedRows[0] }, { status: 200 });
-  } catch (err: unknown) {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: "Failed to move task", detail: err instanceof Error ? err.message : String(err) },
+      { error: "Failed to move task", detail: err?.message ?? String(err) },
       { status: 500 }
     );
   }

@@ -5,8 +5,8 @@ import { getUserId } from "@/lib/getUser";
 export const runtime = "nodejs";
 
 // Helper to read and validate the dynamic :id
-async function readListId(params: Promise<{ id: string }>) {
-  const { id } = await params;
+async function readListId(paramsPromise: Promise<{ id: string }>) {
+  const { id } = await paramsPromise;
   const listId = Number(id);
   if (!Number.isFinite(listId) || listId <= 0) {
     throw new Error("Invalid list id");
@@ -33,15 +33,15 @@ export async function GET(
       )
       .all(ownerId, listId);
 
-    const items = (rows as Record<string, unknown>[]).map((r) => ({
+    const items = rows.map((r: any) => ({
       ...r,
-      tags: JSON.parse((r.tags as string) || "[]"),
+      tags: JSON.parse(r.tags || "[]"),
     }));
 
     return NextResponse.json(items);
-  } catch (err: unknown) {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch items" },
+      { error: err?.message || "Failed to fetch items" },
       { status: 400 }
     );
   }
@@ -53,7 +53,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body: TodoItemPayload = await req.json().catch(() => ({} as Record<string, unknown>));
+    const body: TodoItemPayload = await req.json().catch(() => ({} as any));
     if (!body?.content || typeof body.content !== "string") {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
     }
@@ -77,7 +77,7 @@ export async function POST(
             .prepare(
               `SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?`
             )
-            .get(listId) as { pos: number }).pos;
+            .get(listId) as any).pos;
 
     const info = d
       .prepare(
@@ -106,13 +106,13 @@ export async function POST(
 
     const row = d
       .prepare(`SELECT * FROM todo_items WHERE id = ?`)
-      .get(info.lastInsertRowid as number) as Record<string, unknown>;
-    row.tags = JSON.parse((row.tags as string) || "[]");
+      .get(info.lastInsertRowid as number) as any;
+    row.tags = JSON.parse(row.tags || "[]");
 
     return NextResponse.json(row, { status: 201 });
-  } catch (err: unknown) {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create item" },
+      { error: err?.message || "Failed to create item" },
       { status: 400 }
     );
   }

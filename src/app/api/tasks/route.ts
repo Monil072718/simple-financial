@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       const { query } = await import("@/lib/db");
       
       const profile = await getProfile(parsed.data.assigneeId);
-      if (profile && 'telegram_chat_id' in profile && profile.telegram_chat_id) {
+      if (profile && (profile as any).telegram_chat_id) {
         const projectResult = await query("SELECT name FROM projects WHERE id = $1", [parsed.data.projectId]);
         const projectName = projectResult.rows[0]?.name || "Unknown Project";
         
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         const profileLite = {
           id: profile.id,
           name: profile.full_name,
-          telegram_chat_id: profile.telegram_chat_id ?? null,
+          telegram_chat_id: (profile as any).telegram_chat_id,
           email: profile.email
         };
         

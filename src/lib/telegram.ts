@@ -1,6 +1,5 @@
 // src/lib/telegram.ts
 import { Telegraf, Markup } from "telegraf";
-import type { InlineKeyboardMarkup, ParseMode } from "typegram";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -91,36 +90,27 @@ export async function startBot() {
 
   try {
     const isProd = process.env.NODE_ENV === "production";
-    const botInstance = g.__bot!;
 
     // Build webhook URL (prod only)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
-    const webhookUrl = baseUrl
-      ? `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`
-      : undefined;
+    const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
 
     if (isProd) {
-      try {
-        await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
-      } catch {}
-      if (webhookUrl) {
-        await botInstance.telegram.setWebhook(webhookUrl);
-        console.log("Telegram webhook configured:", webhookUrl);
-      } else {
-        console.warn("No APP_URL/PUBLIC_URL set; cannot configure Telegram webhook.");
-      }
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+      await bot.telegram.setWebhook(webhookUrl);
+      console.log("Telegram webhook configured:", webhookUrl);
     } else {
       // Dev → polling
-      await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
-      await botInstance.launch({ dropPendingUpdates: true });
+      await bot.launch({ dropPendingUpdates: true });
       console.log("Telegram bot started with polling");
     }
 
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          await botInstance.stop("SIGTERM");
+          await bot.stop("SIGTERM");
         } catch {}
       };
       process.once("SIGINT", stop);
@@ -128,9 +118,8 @@ export async function startBot() {
     }
 
     g.__botStarted = true;
-  } catch (error: unknown) {
-    const errorCode = (error as { response?: { error_code?: number } })?.response?.error_code;
-    if (String(errorCode) === "409") {
+  } catch (error: any) {
+    if (String(error?.response?.error_code) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
@@ -144,13 +133,13 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: unknown) {
+export async function handleTelegramUpdate(update: any) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
-    await g.__bot.handleUpdate(update as Parameters<typeof g.__bot.handleUpdate>[0]);
+    await g.__bot.handleUpdate(update);
   } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
@@ -199,7 +188,6 @@ function fmt(s?: string) {
 }
 
 // Keep escapeMd around in case you switch back to Markdown later
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function escapeMd(text: string) {
   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }
@@ -211,79 +199,70 @@ export async function sendTaskAssignedMsg(
   task: TaskMsg,
   adminEmail: string,
   aiUrl?: string
-): Promise<{ ok: boolean; reason?: string; error?: unknown; message_id?: number }> {
+): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
     if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
     if (!g.__botStarted) await startBot();
 
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
-
+    
     // Format priority with emoji
-    const priorityEmoji: Record<string, string> = {
-      low: "🟢",
-      medium: "🟡",
-      high: "🔴",
+    const priorityEmoji = {
+      'low': '🟢',
+      'medium': '🟡', 
+      'high': '🔴'
     };
-    const priorityKey = task.priority ? task.priority.toLowerCase() : "";
-    const priorityText = task.priority
-      ? `${priorityEmoji[priorityKey] || "🟡"} ${task.priority.toUpperCase()}`
-      : "";
-
+    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    
     // Format AI communication info
-    const aiCommText = task.aiComm?.active
-      ? `\n🤖 AI Communication: ${task.aiComm.frequency || "daily"}${
-          task.aiComm.days ? ` (${task.aiComm.days.join(", ")})` : ""
-        }`
-      : "";
-
+    const aiCommText = task.aiComm?.active ? 
+      `\n🤖 AI Communication: ${task.aiComm.frequency || 'daily'}${task.aiComm.days ? ` (${task.aiComm.days.join(', ')})` : ''}` : '';
+    
     const textLines = [
       "🆕 *NEW TASK ASSIGNED*",
       "",
       `📋 *${task.title}*`,
-      task.description ? `\n📝 ${task.description.slice(0, 500)}` : "",
-      task.projectName ? `\n🏢 Project: ${task.projectName}` : "",
-      priorityText ? `\n${priorityText}` : "",
-      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : "",
-      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : "",
+      task.description ? `\n📝 ${task.description.slice(0, 500)}` : '',
+      task.projectName ? `\n🏢 Project: ${task.projectName}` : '',
+      priorityText ? `\n${priorityText}` : '',
+      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : '',
+      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : '',
       aiCommText,
-      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : "",
+      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : '',
       "",
       "─".repeat(20),
-      aiBtnAllowed ? "💡 Need help? Tap 'Ask AI' below or email admin" : `💡 Questions? Email: ${adminEmail}`,
-      aiBtnAllowed ? "" : aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : "",
+      aiBtnAllowed
+        ? "💡 Need help? Tap 'Ask AI' below or email admin"
+        : `💡 Questions? Email: ${adminEmail}`,
+      aiBtnAllowed ? "" : (aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : ""),
     ]
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: InlineKeyboardMarkup["inline_keyboard"] = [];
-    if (aiBtnAllowed && aiUrl) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl }]);
+    const inline_keyboard: any[] = [];
+    if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
+    // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    // Properly typed options for Telegraf / Telegram API
-    const PARSE_MODE: ParseMode = "Markdown";
-    const opts: { parse_mode?: ParseMode; reply_markup?: InlineKeyboardMarkup } = {
-      parse_mode: PARSE_MODE,
+    const opts: any = {
+      parse_mode: 'Markdown'
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
 
-    // chat_id can be string | number; preserve type and trim strings safely
-    let chatId: number | string = profile.telegram_chat_id!;
-    if (typeof chatId === "string") chatId = chatId.trim();
-
+    const chatId = String(profile.telegram_chat_id).trim();
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
-      if (!g.__bot) return { ok: false, reason: "bot_not_configured" };
-      const msg = await g.__bot.telegram.sendMessage(chatId, textLines, opts);
+      const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
-    } catch (err: unknown) {
-      const code = (err as { response?: { error_code?: number } })?.response?.error_code;
-      const desc = String((err as { response?: { description?: string } })?.response?.description || "");
+    } catch (err: any) {
+      const code = err?.response?.error_code;
+      const desc = String(err?.response?.description || "");
       console.error("Telegram sendMessage failed:", { code, desc });
 
       if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
       if (code === 403) return { ok: false, reason: "user_blocked_bot" };
-      return { ok: false, error: (err as { response?: unknown })?.response || err };
+      return { ok: false, error: err?.response || err };
     }
   } catch (error) {
     console.error("Unexpected error in sendTaskAssignedMsg:", error);

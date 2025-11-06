@@ -19,7 +19,7 @@ export async function listTasks({
 }) {
   const offset = (page - 1) * limit;
   const wh: string[] = [];
-  const params: unknown[] = [];
+  const params: any[] = [];
   
   // Filter by user's projects
   if (userId) {
@@ -48,7 +48,7 @@ export async function listTasks({
   return rows;
 }
 
-export async function createTask(data: Record<string, unknown>) {
+export async function createTask(data: any) {
   // Check for duplicate task titles in the same project (only if not moving from todo)
   if (!data._isFromTodo) {
     const { rows: existingTasks } = await query(
@@ -98,7 +98,7 @@ export async function getTask(id: number) {
   return rows[0] ?? null;
 }
 
-export async function updateTask(id: number, data: Record<string, unknown>) {
+export async function updateTask(id: number, data: any) {
   const assigneeProvided =
     Object.prototype.hasOwnProperty.call(data, "assigneeId");
 
@@ -152,28 +152,27 @@ export async function deleteTask(id: number) {
   await query("DELETE FROM tasks WHERE id=$1", [id]);
   return true;
 }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function afterAssignNotify(assigneeId: number, task: Record<string, unknown>, project: Record<string, unknown>) {
+async function afterAssignNotify(assigneeId: number, task: any, project: any) {
   const profileRaw = await getProfileLiteById(assigneeId);
   if (!profileRaw) return;
 
   // Convert null name to undefined to match ProfileLite type
   const profile = {
     ...profileRaw,
-    name: profileRaw.full_name ?? undefined,
+    name: profileRaw.name ?? undefined,
   };
 
   await sendTaskAssignedMsg(
     profile,
     {
-      id: task.id as number,
-      title: task.title as string,
-      description: task.description as string | undefined,
-      startDate: task.start_date as string | undefined,
-      endDate: task.end_date as string | undefined,
-      projectName: project?.name as string | undefined,
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      startDate: task.start_date,
+      endDate: task.end_date,
+      projectName: project?.name,
     },
     'patelmonil1807@gmail.com',
-    `${process.env.PUBLIC_URL}/ai?taskId=${task.id as number}` // your AI page
+    `${process.env.PUBLIC_URL}/ai?taskId=${task.id}` // your AI page
   );
 }

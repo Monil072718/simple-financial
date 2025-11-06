@@ -112,7 +112,6 @@ export async function verifyPassword(email: string, plain: string): Promise<User
   const ok = await bcrypt.compare(plain, row.password_hash);
   if (!ok) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password_hash, ...publicUser } = row;
   return publicUser as User;
 }

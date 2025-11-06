@@ -23,7 +23,7 @@ export async function PATCH(
   const { id } = await ctx.params;
 
   // Read raw body
-  const raw = await req.json().catch(() => ({} as Record<string, unknown>));
+  const raw = await req.json().catch(() => ({} as any));
 
   // No coercion needed - all statuses are now supported in the database
   // const coerceStatus = (s: any) => {

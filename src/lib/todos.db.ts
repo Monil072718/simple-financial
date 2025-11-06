@@ -1,29 +1,10 @@
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
-
+import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
-/**
- * Minimal shape we need from better-sqlite3's Database.
- * (Avoids depending on @types/better-sqlite3 for builds.)
- */
-type PreparedStatement = {
-  get(...params: unknown[]): unknown;
-  run(...params: unknown[]): { changes: number; lastInsertRowid?: number };
-  all(...params: unknown[]): unknown[];
-};
+let _db: Database.Database | null = null;
 
-type SqliteDB = {
-  exec(sql: string): unknown;
-  pragma(setting: string): unknown;
-  prepare(sql: string): PreparedStatement;
-  transaction(fn: () => void): () => void;
-};
-
-// Hold a single process-wide instance
-let _db: SqliteDB | null = null;
-
-function ensureTodoSchema(d: SqliteDB) {
+function ensureTodoSchema(d: Database.Database) {
   // Only SQLite-safe DDL for the To-Do module
   d.exec(`
     PRAGMA foreign_keys = ON;
@@ -65,35 +46,22 @@ function ensureTodoSchema(d: SqliteDB) {
   `);
 }
 
-export function db(): SqliteDB {
+export function db() {
   if (_db) return _db;
 
-  // Use require() so TS doesn't need type defs for better-sqlite3
-  // (ES import would require @types/better-sqlite3 or a manual module declaration.)
-  const BetterSqlite3 = require("better-sqlite3") as any;
+  const dbDir = path.join(process.cwd(), "db");
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
-  // On serverless platforms (e.g., Vercel), writable disk is not guaranteed.
-  // Fallback to in-memory DB to avoid runtime crashes.
-  const isServerless = !!process.env.VERCEL || process.env.NEXT_RUNTIME === "edge";
+  const dbPath = path.join(dbDir, "nexusflow.sqlite");
+  _db = new Database(dbPath);
 
-  let dbPath: string;
-  if (isServerless) {
-    dbPath = ":memory:";
-  } else {
-    const dbDir = path.join(process.cwd(), "db");
-    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-    dbPath = path.join(dbDir, "nexusflow.sqlite");
-  }
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
 
-  const instance: SqliteDB = new BetterSqlite3(dbPath);
-  instance.pragma("journal_mode = WAL");
-  instance.pragma("foreign_keys = ON");
+  // Create ONLY the To-Do schema (ignore global database.sql to avoid CREATE EXTENSION errors)
+  ensureTodoSchema(_db);
 
-  // Create ONLY the To-Do schema (avoid any CREATE EXTENSION etc.)
-  ensureTodoSchema(instance);
-
-  _db = instance;
-  return _db;
+  return _db!;
 }
 
 export type TodoItemPayload = {
