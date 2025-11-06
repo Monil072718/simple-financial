@@ -4,6 +4,14 @@ import { NextRequest } from "next/server";
 
 export type AuthUser = { id: number; email: string };
 
+function isAuthPayload(p: unknown): p is { sub: string | number; email: string } {
+  if (!p || typeof p !== "object") return false;
+  const obj = p as Record<string, unknown>;
+  const hasSub = typeof obj.sub === "string" || typeof obj.sub === "number";
+  const hasEmail = typeof obj.email === "string";
+  return hasSub && hasEmail;
+}
+
 export function verifyAuth(headerAuth?: string): AuthUser | null {
   if (!headerAuth) return null;
   const [scheme, token] = headerAuth.split(" ");
@@ -13,19 +21,16 @@ export function verifyAuth(headerAuth?: string): AuthUser | null {
   if (!secret) throw new Error("JWT_SECRET not set");
 
   try {
-    // verify can return string | JwtPayload
+    // jwt.verify -> string | JwtPayload
     const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
 
-    // If it's a string, it's not our object payload
-    if (typeof decoded === "string") return null;
+    if (typeof decoded === "string") return null; // not an object payload
 
-    // decoded is JwtPayload; pull fields safely
-    const sub = decoded.sub;               // string | number | undefined
-    const email = (decoded as any).email;  // JwtPayload is indexable
+    // Narrow the arbitrary JwtPayload to what we actually need
+    if (!isAuthPayload(decoded as unknown)) return null;
 
-    if (sub == null || !email) return null;
-
-    return { id: Number(sub), email: String(email) };
+    const { sub, email } = decoded as JwtPayload & { sub: string | number; email: string };
+    return { id: Number(sub), email };
   } catch {
     return null;
   }

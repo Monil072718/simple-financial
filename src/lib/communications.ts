@@ -1,6 +1,40 @@
 import { query } from "@/lib/db";
 
-export async function ensureCommSchema() {
+/** Row returned when we upsert/read a schedule */
+type CommScheduleRow = {
+  id: number;
+  user_id: number;
+  task_id: number;
+  active: boolean;
+  frequency: string;
+  days: string[];
+  prompt: string | null;
+  created_at: string; // ISO timestamp
+  updated_at: string; // ISO timestamp
+};
+
+/** Row returned by listSchedules (joins task title & assignee) */
+type ScheduleListRow = {
+  id: number;
+  task_id: number;
+  active: boolean;
+  frequency: string;
+  days: string[];
+  prompt: string | null;
+  title: string;
+  assignee_id: number | null;
+};
+
+/** Row returned by listLogs */
+type CommLogRow = {
+  id: number;
+  task_id: number;
+  recipient: string | null;
+  summary: string | null;
+  timestamp: string; // ISO timestamp
+};
+
+export async function ensureCommSchema(): Promise<void> {
   await query(`
     CREATE TABLE IF NOT EXISTS comm_schedules (
       id SERIAL PRIMARY KEY,
@@ -38,8 +72,8 @@ export async function upsertSchedule(input: {
   frequency?: string;
   days?: string[];
   prompt?: string;
-}) {
-  const { rows } = await query(
+}): Promise<CommScheduleRow> {
+  const { rows } = await query<CommScheduleRow>(
     `INSERT INTO comm_schedules (user_id, task_id, active, frequency, days, prompt)
      VALUES ($1,$2,COALESCE($3,false),COALESCE($4,'daily'),COALESCE($5,ARRAY[]::TEXT[]),$6)
      ON CONFLICT (task_id) DO UPDATE SET
@@ -49,19 +83,30 @@ export async function upsertSchedule(input: {
        prompt=EXCLUDED.prompt,
        updated_at=NOW()
      RETURNING id, user_id, task_id, active, frequency, days, prompt, created_at, updated_at`,
-    [input.userId, input.taskId, input.active ?? false, input.frequency ?? 'daily', (input.days ?? []) as any[], input.prompt ?? null]
+    [
+      input.userId,
+      input.taskId,
+      input.active ?? false,
+      input.frequency ?? "daily",
+      (input.days ?? []) as string[],
+      input.prompt ?? null,
+    ]
   );
   return rows[0];
 }
 
-export async function listSchedules(opts: { userId: number; projectId?: number }) {
-  const params: any[] = [opts.userId];
+export async function listSchedules(
+  opts: { userId: number; projectId?: number }
+): Promise<ScheduleListRow[]> {
+  const params: unknown[] = [opts.userId];
   let where = `WHERE cs.user_id = $1`;
+
   if (opts.projectId) {
     params.push(opts.projectId);
     where += ` AND t.project_id = $${params.length}`;
   }
-  const { rows } = await query(
+
+  const { rows } = await query<ScheduleListRow>(
     `SELECT cs.id, cs.task_id, cs.active, cs.frequency, cs.days, cs.prompt,
             t.title, t.assignee_id
        FROM comm_schedules cs
@@ -73,15 +118,20 @@ export async function listSchedules(opts: { userId: number; projectId?: number }
   return rows;
 }
 
-export async function listLogs(opts: { userId: number; projectId?: number; limit?: number }) {
-  const params: any[] = [opts.userId];
+export async function listLogs(
+  opts: { userId: number; projectId?: number; limit?: number }
+): Promise<CommLogRow[]> {
+  const params: unknown[] = [opts.userId];
   let where = `WHERE cl.user_id = $1`;
+
   if (opts.projectId) {
     params.push(opts.projectId);
     where += ` AND t.project_id = $${params.length}`;
   }
+
   const limit = Math.max(1, Math.min(200, opts.limit ?? 50));
-  const { rows } = await query(
+
+  const { rows } = await query<CommLogRow>(
     `SELECT cl.id, cl.task_id, cl.recipient, cl.summary, cl.timestamp
        FROM comm_logs cl
        JOIN tasks t ON t.id = cl.task_id
@@ -92,5 +142,3 @@ export async function listLogs(opts: { userId: number; projectId?: number; limit
   );
   return rows;
 }
-
-

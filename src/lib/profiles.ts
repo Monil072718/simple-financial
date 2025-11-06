@@ -1,3 +1,4 @@
+// src/lib/profiles.ts
 import { query } from "@/lib/db";
 
 export type ProfileRow = {
@@ -65,7 +66,7 @@ export async function listProfiles(
   }
 
   const offset = (page - 1) * limit;
-  const params: any[] = [];
+  const params: unknown[] = []; // ✅ no `any`
   let where = "";
 
   if (q) {
@@ -100,7 +101,7 @@ export async function listProfiles(
   return rows;
 }
 
-export async function getProfile(id: number) {
+export async function getProfile(id: number): Promise<ProfileRow | null> {
   const { rows } = await query<ProfileRow>(
     `SELECT * FROM profiles WHERE id = $1`,
     [id]
@@ -108,7 +109,7 @@ export async function getProfile(id: number) {
   return rows[0] ?? null;
 }
 
-export async function createProfile(data: CreateProfileInput) {
+export async function createProfile(data: CreateProfileInput): Promise<ProfileRow> {
   const { rows } = await query<ProfileRow>(
     `INSERT INTO profiles
       (user_id, full_name, title, description, email, phone, linkedin_url, github_url,
@@ -132,7 +133,10 @@ export async function createProfile(data: CreateProfileInput) {
   return rows[0];
 }
 
-export async function updateProfile(id: number, data: UpdateProfileInput) {
+export async function updateProfile(
+  id: number,
+  data: UpdateProfileInput
+): Promise<ProfileRow | null> {
   const { rows } = await query<ProfileRow>(
     `UPDATE profiles SET
         user_id        = COALESCE($1, user_id),
@@ -167,15 +171,18 @@ export async function updateProfile(id: number, data: UpdateProfileInput) {
   return rows[0] ?? null;
 }
 
-export async function deleteProfile(id: number) {
+export async function deleteProfile(id: number): Promise<boolean> {
   await query("DELETE FROM profiles WHERE id = $1", [id]);
   return true;
 }
+
 // src/lib/profiles.ts (or wherever this lives)
-export async function findProfileByPhone(rawPhone: string) {
+export async function findProfileByPhone(
+  rawPhone: string
+): Promise<{ id: number; phone: string } | null> {
   // Keep digits only
   const onlyDigits = rawPhone.replace(/\D/g, "");
-  // Use last 10 digits for matching (tweak to 8–12 if your domain needs)
+  // Use last 10 digits for matching (tweak as needed)
   const last10 = onlyDigits.slice(-10);
 
   const { rows } = await query<{ id: number; phone: string }>(
@@ -198,7 +205,7 @@ export async function linkTelegramToProfile(
     telegram_username: string | null;
     telegram_opt_in: boolean;
   }
-) {
+): Promise<true> {
   await query(
     `UPDATE profiles
      SET telegram_chat_id = $1,
@@ -215,7 +222,10 @@ export async function linkTelegramToProfile(
   );
   return true;
 }
-export async function getProfileLiteById(profileId: number) {
+
+export async function getProfileLiteById(
+  profileId: number
+): Promise<{ id: number; full_name: string | null; telegram_chat_id: number | null } | null> {
   const { rows } = await query<{
     id: number;
     full_name: string | null;

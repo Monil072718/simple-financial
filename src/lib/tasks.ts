@@ -1,7 +1,49 @@
 import { query } from "@/lib/db";
-import { getProfileLiteById } from '@/lib/profiles';
-import { sendTaskAssignedMsg } from '@/lib/telegram';
 
+export type TaskRow = {
+  id: number;
+  project_id: number;
+  title: string;
+  description: string | null;
+  assignee_id: number | null;
+  status: string;
+  priority: string | null;
+  due_date: string | null;   // ISO date
+  created_at: string;        // ISO timestamp
+};
+
+export type ListTasksParams = {
+  projectId?: number;
+  assigneeId?: number;
+  status?: string;
+  page?: number;
+  limit?: number;
+  userId?: number;
+};
+
+export type CreateTaskInput = {
+  projectId: number;
+  title: string;
+  description?: string | null;
+  assigneeId?: number | null;
+  status?: string | null;     // defaults to 'todo' in SQL
+  priority?: string | null;   // defaults to 'medium' in SQL
+  dueDate?: string | null;    // 'YYYY-MM-DD'
+  _isFromTodo?: boolean;      // internal flag used by caller
+};
+
+export type UpdateTaskInput = {
+  title?: string | null;
+  description?: string | null;
+  assigneeId?: number | null;
+  status?: string | null;
+  priority?: string | null;
+  dueDate?: string | null;
+};
+
+/**
+ * List tasks with optional filters + pagination.
+ */
 export async function listTasks({
   projectId,
   assigneeId,
@@ -9,64 +51,80 @@ export async function listTasks({
   page = 1,
   limit = 10,
   userId,
-}: {
-  projectId?: number;
-  assigneeId?: number;
-  status?: string;
-  page?: number;
-  limit?: number;
-  userId?: number;
-}) {
+}: ListTasksParams): Promise<TaskRow[]> {
   const offset = (page - 1) * limit;
-  const wh: string[] = [];
-  const params: any[] = [];
-  
-  // Filter by user's projects
-  if (userId) {
+
+  const whereParts: string[] = [];
+  const params: unknown[] = [];
+
+  if (typeof userId === "number") {
     params.push(userId);
-    wh.push(`project_id IN (SELECT id FROM projects WHERE owner_id = $${params.length})`);
+    whereParts.push(
+      `project_id IN (SELECT id FROM projects WHERE owner_id = $${params.length})`
+    );
   }
-  
-  if (projectId) {
+
+  if (typeof projectId === "number") {
     params.push(projectId);
-    wh.push(`project_id=$${params.length}`);
+    whereParts.push(`project_id = $${params.length}`);
   }
-  if (assigneeId) {
+
+  if (typeof assigneeId === "number") {
     params.push(assigneeId);
-    wh.push(`assignee_id=$${params.length}`);
+    whereParts.push(`assignee_id = $${params.length}`);
   }
-  if (status) {
+
+  if (typeof status === "string" && status.trim() !== "") {
     params.push(status);
-    wh.push(`status=$${params.length}`);
+    whereParts.push(`status = $${params.length}`);
   }
-  const where = wh.length ? `WHERE ${wh.join(" AND ")}` : "";
-  const { rows } = await query(
-    `SELECT id,project_id,title,description,assignee_id,status,priority,due_date,created_at
-     FROM tasks ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`,
+
+  const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  // Parameterize limit/offset as well
+  params.push(limit);
+  const pLimit = params.length;
+  params.push(offset);
+  const pOffset = params.length;
+
+  const { rows } = await query<TaskRow>(
+    `SELECT id, project_id, title, description, assignee_id, status, priority, due_date, created_at
+       FROM tasks
+       ${where}
+       ORDER BY id DESC
+       LIMIT $${pLimit} OFFSET $${pOffset}`,
     params
   );
+
   return rows;
 }
 
-export async function createTask(data: any) {
-  // Check for duplicate task titles in the same project (only if not moving from todo)
+/**
+ * Create a task (with duplicate title check per project).
+ */
+export async function createTask(data: CreateTaskInput): Promise<TaskRow> {
+  // Check duplicate titles in the same project unless explicitly skipped
   if (!data._isFromTodo) {
-    const { rows: existingTasks } = await query(
-      "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2)",
+    const { rows: existing } = await query<{ id: number }>(
+      `SELECT id
+         FROM tasks
+        WHERE project_id = $1 AND LOWER(title) = LOWER($2)
+        LIMIT 1`,
       [data.projectId, data.title]
     );
-    
-    if (existingTasks.length > 0) {
-      throw new Error(`A task with the title "${data.title}" already exists in this project`);
+    if (existing.length > 0) {
+      throw new Error(
+        `A task with the title "${data.title}" already exists in this project`
+      );
     }
   }
 
-  // NOTE: assignee_id is resolved via subselect to avoid FK errors.
-  const { rows } = await query(
-    `INSERT INTO tasks(
+  // Insert; assignee resolved via subselect to avoid FK errors
+  const { rows } = await query<TaskRow>(
+    `INSERT INTO tasks (
         project_id, title, description, assignee_id, status, priority, due_date
      )
-     VALUES(
+     VALUES (
         $1, $2, $3,
         CASE
           WHEN $4::int IS NULL THEN NULL::int
@@ -76,33 +134,47 @@ export async function createTask(data: any) {
         COALESCE($6,'medium'),
         $7
      )
-     RETURNING id,project_id,title,description,assignee_id,status,priority,due_date,created_at`,
+     RETURNING id, project_id, title, description, assignee_id, status, priority, due_date, created_at`,
     [
       data.projectId,
       data.title,
       data.description ?? null,
-      data.assigneeId ?? null, // may be unknown; subselect makes it NULL safely
+      data.assigneeId ?? null,
       data.status ?? null,
       data.priority ?? null,
       data.dueDate ?? null,
     ]
   );
+
   return rows[0];
 }
 
-export async function getTask(id: number) {
-  const { rows } = await query(
-    "SELECT id,project_id,title,description,assignee_id,status,priority,due_date,created_at FROM tasks WHERE id=$1",
+/**
+ * Get a single task by id.
+ */
+export async function getTask(id: number): Promise<TaskRow | null> {
+  const { rows } = await query<TaskRow>(
+    `SELECT id, project_id, title, description, assignee_id, status, priority, due_date, created_at
+       FROM tasks
+      WHERE id = $1`,
     [id]
   );
   return rows[0] ?? null;
 }
 
-export async function updateTask(id: number, data: any) {
-  const assigneeProvided =
-    Object.prototype.hasOwnProperty.call(data, "assigneeId");
+/**
+ * Update a task (partial).
+ */
+export async function updateTask(
+  id: number,
+  data: UpdateTaskInput
+): Promise<TaskRow | null> {
+  const assigneeProvided = Object.prototype.hasOwnProperty.call(
+    data,
+    "assigneeId"
+  );
 
-  // normalize: never send undefined to PG
+  // Normalize: never send undefined to PG
   let assigneeValue: number | null = null;
   if (assigneeProvided) {
     const n = Number(data.assigneeId);
@@ -128,51 +200,27 @@ export async function updateTask(id: number, data: any) {
     RETURNING id, project_id, title, description, assignee_id, status, priority, due_date, created_at
   `;
 
-  const params = [
-    data.title ?? null,
-    data.description ?? null,
-    assigneeValue,             // $3 (will be number or null)
-    data.status ?? null,
-    data.priority ?? null,
-    data.dueDate ?? null,
-    id,                        // $7
-    assigneeProvided,          // $8 (boolean)
+  const params: ReadonlyArray<
+    string | number | boolean | null
+  > = [
+    data.title ?? null,          // $1
+    data.description ?? null,    // $2
+    assigneeValue,               // $3
+    data.status ?? null,         // $4
+    data.priority ?? null,       // $5
+    data.dueDate ?? null,        // $6
+    id,                          // $7
+    assigneeProvided,            // $8 (boolean)
   ];
 
-  // Temporarily log to double-check the types:
-  // console.log("params:", params.map(v => [v, typeof v]));
-
-  const { rows } = await query(sql, params);
+  const { rows } = await query<TaskRow>(sql, params);
   return rows[0] ?? null;
 }
 
-
-
-export async function deleteTask(id: number) {
-  await query("DELETE FROM tasks WHERE id=$1", [id]);
+/**
+ * Delete a task.
+ */
+export async function deleteTask(id: number): Promise<true> {
+  await query("DELETE FROM tasks WHERE id = $1", [id]);
   return true;
-}
-async function afterAssignNotify(assigneeId: number, task: any, project: any) {
-  const profileRaw = await getProfileLiteById(assigneeId);
-  if (!profileRaw) return;
-
-  // Convert null name to undefined to match ProfileLite type
-  const profile = {
-    ...profileRaw,
-    name: profileRaw.name ?? undefined,
-  };
-
-  await sendTaskAssignedMsg(
-    profile,
-    {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      startDate: task.start_date,
-      endDate: task.end_date,
-      projectName: project?.name,
-    },
-    'patelmonil1807@gmail.com',
-    `${process.env.PUBLIC_URL}/ai?taskId=${task.id}` // your AI page
-  );
 }

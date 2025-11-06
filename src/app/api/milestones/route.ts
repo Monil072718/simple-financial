@@ -15,6 +15,15 @@ const createSchema = z.object({
   difficulty: z.enum(["Easy", "Medium", "Hard"]).default("Medium"),
 });
 
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req);
@@ -40,9 +49,9 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json(rows);
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to fetch milestones", detail: err?.message ?? String(err) },
+      { error: "Failed to fetch milestones", detail: errorMessage(err) },
       { status: 500 }
     );
   }
@@ -53,7 +62,7 @@ export async function POST(req: NextRequest) {
     const user = getAuthUser(req);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const json = await req.json().catch(() => ({}));
+    const json = await req.json().catch(() => ({} as unknown));
     const parsed = createSchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -76,9 +85,9 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json(rows[0], { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: "Failed to save milestone", detail: err?.message ?? String(err) },
+      { error: "Failed to save milestone", detail: errorMessage(err) },
       { status: 500 }
     );
   }
