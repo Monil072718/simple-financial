@@ -15,14 +15,16 @@ const updateSchema = z.object({
 
 type UpdatePayload = z.infer<typeof updateSchema>;
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, context: any) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const id = Number(params.id);
+  const idStr: string | undefined = context?.params?.id;
+  const id = Number(idStr);
+  if (!idStr || Number.isNaN(id)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
   const json = (await req.json().catch(() => ({}))) as unknown;
   const parsed = updateSchema.safeParse(json);
   if (!parsed.success) {
@@ -45,7 +47,6 @@ export async function PATCH(
 
   // Build dynamic SET list
   const sets: string[] = [];
-  // All updatable values are strings or null (enums are strings)
   const vals: (string | null)[] = [];
   let idx = 1;
 
@@ -89,14 +90,15 @@ export async function PATCH(
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, context: any) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const id = Number(params.id);
+  const idStr: string | undefined = context?.params?.id;
+  const id = Number(idStr);
+  if (!idStr || Number.isNaN(id)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
 
   // Ownership check
   const { rows: msRows } = await query(
