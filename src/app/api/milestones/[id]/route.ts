@@ -5,7 +5,8 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-type RouteContext = { params?: Record<string, string | string[]> };
+// Narrower shape we’ll cast to (not used in the signature)
+type CtxParams = { params?: Record<string, string | string[]> };
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -14,21 +15,20 @@ const updateSchema = z.object({
   priority: z.enum(["Low", "Medium", "High"]).optional(),
   difficulty: z.enum(["Easy", "Medium", "Hard"]).optional(),
 });
-
 type UpdatePayload = z.infer<typeof updateSchema>;
 
-// Helper to safely read a single string param that may be string | string[]
-function getParam(ctx: RouteContext, key: string): string | undefined {
-  const v = ctx?.params?.[key];
-  if (Array.isArray(v)) return v[0];
-  return v;
+// Safe getter for id that may be string | string[]
+function getId(context: unknown): string | undefined {
+  const params = (context as CtxParams | undefined)?.params;
+  const raw = params?.id;
+  return Array.isArray(raw) ? raw[0] : raw;
 }
 
-export async function PATCH(req: NextRequest, context: RouteContext) {
+export async function PATCH(req: NextRequest, context: unknown) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr = getParam(context, "id");
+  const idStr = getId(context);
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -40,7 +40,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // Load milestone + project ownership
   const { rows: msRows } = await query(
     `SELECT m.*, p.owner_email
      FROM milestones m
@@ -54,18 +53,15 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Build dynamic SET list
   const sets: string[] = [];
   const vals: (string | null)[] = [];
   let idx = 1;
-
   const push = (column: string, value: string | null) => {
     sets.push(`${column} = $${++idx}`);
     vals.push(value);
   };
 
   const data: UpdatePayload = parsed.data;
-
   if (data.title !== undefined) push("title", data.title);
   if (data.description !== undefined) push("description", data.description);
   if (data.dueDate !== undefined) push("due_date", data.dueDate);
@@ -73,7 +69,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (data.difficulty !== undefined) push("difficulty", data.difficulty);
 
   if (!sets.length) {
-    // Nothing to update, just return current
     return NextResponse.json({
       id: ms.id,
       project_id: ms.project_id,
@@ -86,7 +81,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     });
   }
 
-  // First param is id; we already used $1, so vals start after it
   await query(`UPDATE milestones SET ${sets.join(", ")} WHERE id = $1`, [id, ...vals]);
 
   const { rows } = await query(
@@ -99,17 +93,16 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: unknown) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr = getParam(context, "id");
+  const idStr = getId(context);
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  // Ownership check
   const { rows: msRows } = await query(
     `SELECT m.id, p.owner_email
      FROM milestones m
