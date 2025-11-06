@@ -7,10 +7,10 @@ import type { Update } from "telegraf/types";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { secret: string } }
+  { params }: { params: Promise<{ secret: string }> }
 ) {
   const secretInEnv = process.env.TG_WEBHOOK_SECRET;
-  const { secret } = params;
+  const { secret } = await params;
 
   if (!secretInEnv || secret !== secretInEnv) {
     return NextResponse.json({ ok: false, error: "invalid secret" }, { status: 403 });
