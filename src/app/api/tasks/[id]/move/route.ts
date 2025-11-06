@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 
+export const runtime = "nodejs";
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }

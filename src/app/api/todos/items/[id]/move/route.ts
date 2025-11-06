@@ -3,6 +3,8 @@ import { db, nowISO } from "@/lib/todos.db";
 import { getUserId } from "@/lib/getUser";
 import { createTask } from "@/lib/tasks";
 
+export const runtime = "nodejs";
+
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
