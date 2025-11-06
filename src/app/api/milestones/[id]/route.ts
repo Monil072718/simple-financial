@@ -5,6 +5,8 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
+type RouteContext = { params?: Record<string, string | string[]> };
+
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
@@ -15,11 +17,18 @@ const updateSchema = z.object({
 
 type UpdatePayload = z.infer<typeof updateSchema>;
 
-export async function PATCH(req: NextRequest, context: any) {
+// Helper to safely read a single string param that may be string | string[]
+function getParam(ctx: RouteContext, key: string): string | undefined {
+  const v = ctx?.params?.[key];
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
+
+export async function PATCH(req: NextRequest, context: RouteContext) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr: string | undefined = context?.params?.id;
+  const idStr = getParam(context, "id");
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -90,11 +99,11 @@ export async function PATCH(req: NextRequest, context: any) {
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(req: NextRequest, context: any) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr: string | undefined = context?.params?.id;
+  const idStr = getParam(context, "id");
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
