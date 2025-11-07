@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword } from "@/lib/users";
 import { z } from "zod";
-import jwt from "jsonwebtoken";
+import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
+import type { StringValue } from "ms";
 
 export const runtime = "nodejs";
 
@@ -25,28 +26,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
+    const envSecret = process.env.JWT_SECRET;
+    if (!envSecret) {
       console.error("JWT_SECRET missing");
       return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
     }
+    const secret: Secret = envSecret;
 
-    const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
+    // jsonwebtoken wants number (seconds) or an "ms" StringValue (e.g., "7d", "12h")
+    const raw = process.env.JWT_EXPIRES_IN;
+    const expiresIn: number | StringValue =
+      raw == null || raw === ""
+        ? ("7d" as StringValue)
+        : Number.isFinite(Number(raw))
+        ? Number(raw)
+        : (raw as StringValue);
+
+    const signOptions: SignOptions = {
+      algorithm: "HS256",
+      expiresIn,
+    };
 
     const token = jwt.sign(
-      { sub: user.id, email: user.email }, // minimal claims
+      { sub: String(user.id), email: user.email },
       secret,
-      { 
-        algorithm: "HS256", 
-        expiresIn: expiresIn as string | number 
-      }
+      signOptions
     );
 
-    // Return token + public user (no hash)
     return NextResponse.json(
       {
         token,
-        user, // { id, name, email, created_at }
+        user,
       },
       { status: 200 }
     );
