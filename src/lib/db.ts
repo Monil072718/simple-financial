@@ -1,7 +1,8 @@
 // src/lib/db.ts
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 
-const pool = new Pool({
+// Export the pool so callers can use it (e.g., for migrations / health checks)
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
@@ -30,10 +31,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 /**
  * Execute statements where you don't need returned rows (e.g., DDL).
  */
-export async function exec(
-  text: string,
-  params?: ReadonlyArray<unknown>
-): Promise<void> {
+export async function exec(text: string, params?: ReadonlyArray<unknown>): Promise<void> {
   await pool.query(text, params ? [...params] : undefined);
 }
 
