@@ -28,6 +28,43 @@ type TelegramProfileLite = {
   email: string;
 };
 
+// ---- Helpers (no `any`, no `instanceof` on `unknown`) ----
+type TaskLike = {
+  id: number | string;
+  title: string;
+  description?: string | null;
+  priority?: string | null;
+  due_date?: unknown;
+};
+
+function isDateObject(v: unknown): v is Date {
+  // Avoids TS “instanceof on unknown” problem
+  return Object.prototype.toString.call(v) === "[object Date]";
+}
+
+function normalizeDateYMD(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    // If already ISO-like, trim to YYYY-MM-DD; else try to parse
+    const iso = /^\d{4}-\d{2}-\d{2}/.test(v) ? v : new Date(v).toISOString();
+    return iso.slice(0, 10);
+  }
+  if (typeof v === "number") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  if (isDateObject(v)) {
+    return v.toISOString().slice(0, 10);
+  }
+  // Try last-ditch parse for objects like { toDate: fn } etc.
+  try {
+    const d = new Date(String(v));
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
 // Narrowing helper for Telegram profile
 function isProfileWithTelegram(
   p: unknown
@@ -74,22 +111,16 @@ export async function POST(req: NextRequest) {
         const projectResult = await query("SELECT name FROM projects WHERE id = $1", [parsed.data.projectId]);
         const projectName: string = projectResult.rows[0]?.name ?? "Unknown Project";
 
-        // Normalize due_date to string | null
-        const endDate: string | null =
-          task?.due_date == null
-            ? null
-            : typeof task.due_date === "string"
-            ? task.due_date
-            : task.due_date instanceof Date
-            ? task.due_date.toISOString().slice(0, 10)
-            : String(task.due_date);
+        // Safely read and normalize due_date without `instanceof` on a mis-typed property
+        const due = (task as TaskLike | undefined)?.due_date;
+        const endDate = normalizeDateYMD(due);
 
         const taskMsg = {
-          id: Number(task.id),
-          title: String(task.title),
-          description: task.description ?? undefined,
+          id: Number((task as TaskLike).id),
+          title: String((task as TaskLike).title),
+          description: (task as TaskLike).description ?? undefined,
           projectName,
-          priority: String(task.priority),
+          priority: String((task as TaskLike).priority ?? ""),
           endDate: endDate ?? undefined,
           aiComm: {
             active: false,
