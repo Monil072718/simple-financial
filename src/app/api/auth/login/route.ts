@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
     const token = jwt.sign(
       { sub: user.id, email: user.email }, // minimal claims
       secret,
-      { algorithm: "HS256", expiresIn }
+      { 
+        algorithm: "HS256", 
+        expiresIn: expiresIn as string | number 
+      }
     );
 
     // Return token + public user (no hash)
