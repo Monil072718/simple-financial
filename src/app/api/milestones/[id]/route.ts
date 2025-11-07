@@ -5,9 +5,6 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-// Narrower shape we’ll cast to (not used in the signature)
-type CtxParams = { params?: Record<string, string | string[]> };
-
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
@@ -17,18 +14,11 @@ const updateSchema = z.object({
 });
 type UpdatePayload = z.infer<typeof updateSchema>;
 
-// Safe getter for id that may be string | string[]
-function getId(context: unknown): string | undefined {
-  const params = (context as CtxParams | undefined)?.params;
-  const raw = params?.id;
-  return Array.isArray(raw) ? raw[0] : raw;
-}
-
-export async function PATCH(req: NextRequest, context: unknown) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr = getId(context);
+  const { id: idStr } = await params;
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
@@ -93,11 +83,11 @@ export async function PATCH(req: NextRequest, context: unknown) {
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(req: NextRequest, context: unknown) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const idStr = getId(context);
+  const { id: idStr } = await params;
   const id = Number(idStr);
   if (!idStr || Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
