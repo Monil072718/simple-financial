@@ -1,14 +1,10 @@
-// src/lib/sqlite.ts  (or your existing path)
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
-// Type for the DB instance from better-sqlite3
-type DB = InstanceType<typeof Database>;
+let _db: Database.Database | null = null;
 
-let _db: DB | null = null;
-
-function ensureTodoSchema(d: DB) {
+function ensureTodoSchema(d: Database.Database) {
   // Only SQLite-safe DDL for the To-Do module
   d.exec(`
     PRAGMA foreign_keys = ON;
@@ -50,7 +46,7 @@ function ensureTodoSchema(d: DB) {
   `);
 }
 
-export function db(): DB {
+export function db() {
   if (_db) return _db;
 
   const dbDir = path.join(process.cwd(), "db");
@@ -62,10 +58,10 @@ export function db(): DB {
   _db.pragma("journal_mode = WAL");
   _db.pragma("foreign_keys = ON");
 
-  // Create ONLY the To-Do schema
+  // Create ONLY the To-Do schema (ignore global database.sql to avoid CREATE EXTENSION errors)
   ensureTodoSchema(_db);
 
-  return _db;
+  return _db!;
 }
 
 export type TodoItemPayload = {

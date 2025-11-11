@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
-import { z } from "zod";
-
-const BodySchema = z.object({
-  projectId: z.coerce.number().int().positive(),
-});
-
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
-}
 
 export async function POST(
   req: NextRequest,
@@ -28,12 +14,8 @@ export async function POST(
     const taskId = Number(id);
     if (!taskId) return NextResponse.json({ error: "Invalid task id" }, { status: 400 });
 
-    const raw = (await req.json().catch(() => ({} as unknown)));
-    const parsed = BodySchema.safeParse(raw);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-    }
-    const { projectId } = parsed.data;
+    const { projectId } = await req.json().catch(() => ({} as any));
+    if (!projectId) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
 
     // Verify the task exists and belongs to user's project
     const { rows: taskRows } = await query(
@@ -65,7 +47,7 @@ export async function POST(
       "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2) AND id != $3",
       [projectId, task.title, taskId]
     );
-
+    
     if (existingTasks.length > 0) {
       return NextResponse.json(
         { error: `A task with the title "${task.title}" already exists in the target project` },
@@ -80,9 +62,9 @@ export async function POST(
     );
 
     return NextResponse.json({ task: updatedRows[0] }, { status: 200 });
-  } catch (err: unknown) {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: "Failed to move task", detail: errorMessage(err) },
+      { error: "Failed to move task", detail: err?.message ?? String(err) },
       { status: 500 }
     );
   }

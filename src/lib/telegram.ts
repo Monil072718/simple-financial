@@ -1,7 +1,5 @@
 // src/lib/telegram.ts
 import { Telegraf, Markup } from "telegraf";
-import type { Update, InlineKeyboardButton, InlineKeyboardMarkup } from "telegraf/types";
-import type { ParseMode } from "typegram";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -35,7 +33,7 @@ if (!g.__bot && token) {
     try {
       const phone = ctx.message?.contact?.phone_number;
       const chatId = ctx.chat?.id;
-      const username = ctx.from?.username ?? null;
+      const username = ctx.from?.username || null;
 
       if (!phone || !chatId) return ctx.reply("Could not read phone/chat.");
 
@@ -63,7 +61,7 @@ if (!g.__bot && token) {
       });
 
       await ctx.reply("Linked! You will now receive task updates here.", Markup.removeKeyboard());
-    } catch (e: unknown) {
+    } catch (e) {
       console.error("contact error", e);
       await ctx.reply("Something went wrong linking your account.");
     }
@@ -82,17 +80,6 @@ export const bot = g.__bot;
 /* ------------------------------ Start / Webhook ----------------------------- */
 let starting = false;
 
-function isTelegramApiError(
-  err: unknown
-): err is { response?: { error_code?: number; description?: string } } {
-  return (
-    !!err &&
-    typeof err === "object" &&
-    "response" in err &&
-    !!(err as { response?: unknown }).response
-  );
-}
-
 export async function startBot() {
   if (g.__botStarted || starting) return;
   if (!token || !g.__bot) {
@@ -105,36 +92,34 @@ export async function startBot() {
     const isProd = process.env.NODE_ENV === "production";
 
     // Build webhook URL (prod only)
-    const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL || "";
+    const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
     const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
 
     if (isProd) {
-      await bot!.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-      await bot!.telegram.setWebhook(webhookUrl);
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+      await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
     } else {
       // Dev → polling
-      await bot!.telegram.deleteWebhook({ drop_pending_updates: true });
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       console.log("Webhook cleared; starting polling…");
-      await bot!.launch({ dropPendingUpdates: true });
+      await bot.launch({ dropPendingUpdates: true });
       console.log("Telegram bot started with polling");
     }
 
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          await bot?.stop("SIGTERM");
-        } catch {
-          /* noop */
-        }
+          await bot.stop("SIGTERM");
+        } catch {}
       };
       process.once("SIGINT", stop);
       process.once("SIGTERM", stop);
     }
 
     g.__botStarted = true;
-  } catch (error: unknown) {
-    if (isTelegramApiError(error) && String(error.response?.error_code) === "409") {
+  } catch (error: any) {
+    if (String(error?.response?.error_code) === "409") {
       console.error(
         "Telegram 409: another process is polling this token.\n" +
           "Stop the other process OR revoke the token and use the new one.\n" +
@@ -148,14 +133,14 @@ export async function startBot() {
   }
 }
 
-export async function handleTelegramUpdate(update: Update) {
+export async function handleTelegramUpdate(update: any) {
   try {
     if (!g.__bot) {
       console.warn("Telegram bot not initialized - cannot handle update");
       return;
     }
     await g.__bot.handleUpdate(update);
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Error handling Telegram update:", error);
   }
 }
@@ -202,61 +187,65 @@ function fmt(s?: string) {
   return new Date(s).toLocaleString("en-GB", { hour12: false });
 }
 
+// Keep escapeMd around in case you switch back to Markdown later
+function escapeMd(text: string) {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+}
+
 /* ----------------------------- Send Task Message ---------------------------- */
+// Plain-text send with conditional inline button (https only). No Markdown fragility.
 export async function sendTaskAssignedMsg(
   profile: ProfileLite,
   task: TaskMsg,
   adminEmail: string,
   aiUrl?: string
-): Promise<{ ok: boolean; reason?: string; error?: unknown; message_id?: number }> {
+): Promise<{ ok: boolean; reason?: string; error?: any; message_id?: number }> {
   try {
     if (!profile?.telegram_chat_id) return { ok: false, reason: "no_chat_id" };
     if (!token || !g.__bot) return { ok: false, reason: "bot_not_configured" };
     if (!g.__botStarted) await startBot();
 
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
-
+    
     // Format priority with emoji
-    const priorityEmoji: Record<string, string> = {
-      low: "🟢",
-      medium: "🟡",
-      high: "🔴",
+    const priorityEmoji = {
+      'low': '🟢',
+      'medium': '🟡', 
+      'high': '🔴'
     };
-    const priorityText = task.priority
-      ? `${priorityEmoji[task.priority.toLowerCase()] || "🟡"} ${task.priority.toUpperCase()}`
-      : "";
-
+    const priorityText = task.priority ? `${priorityEmoji[task.priority.toLowerCase()] || '🟡'} ${task.priority.toUpperCase()}` : '';
+    
     // Format AI communication info
-    const aiCommText = task.aiComm?.active
-      ? `\n🤖 AI Communication: ${task.aiComm.frequency || "daily"}${
-          task.aiComm.days ? ` (${task.aiComm.days.join(", ")})` : ""
-        }`
-      : "";
-
+    const aiCommText = task.aiComm?.active ? 
+      `\n🤖 AI Communication: ${task.aiComm.frequency || 'daily'}${task.aiComm.days ? ` (${task.aiComm.days.join(', ')})` : ''}` : '';
+    
     const textLines = [
       "🆕 *NEW TASK ASSIGNED*",
       "",
       `📋 *${task.title}*`,
-      task.description ? `\n📝 ${task.description.slice(0, 500)}` : "",
-      task.projectName ? `\n🏢 Project: ${task.projectName}` : "",
-      priorityText ? `\n${priorityText}` : "",
-      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : "",
-      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : "",
+      task.description ? `\n📝 ${task.description.slice(0, 500)}` : '',
+      task.projectName ? `\n🏢 Project: ${task.projectName}` : '',
+      priorityText ? `\n${priorityText}` : '',
+      task.endDate ? `\n📅 Due: ${fmt(task.endDate)}` : '',
+      task.referenceLink ? `\n🔗 Reference: ${task.referenceLink}` : '',
       aiCommText,
-      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : "",
+      task.aiComm?.prompt ? `\n💬 AI Prompt: "${task.aiComm.prompt}"` : '',
       "",
       "─".repeat(20),
-      aiBtnAllowed ? "💡 Need help? Tap 'Ask AI' below or email admin" : `💡 Questions? Email: ${adminEmail}`,
-      aiBtnAllowed ? "" : aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : "",
+      aiBtnAllowed
+        ? "💡 Need help? Tap 'Ask AI' below or email admin"
+        : `💡 Questions? Email: ${adminEmail}`,
+      aiBtnAllowed ? "" : (aiUrl ? `\n🤖 AI Assistant: ${aiUrl}` : ""),
     ]
       .filter(Boolean)
       .join("\n");
 
-    const inline_keyboard: InlineKeyboardButton[][] = [];
+    const inline_keyboard: any[] = [];
     if (aiBtnAllowed) inline_keyboard.push([{ text: "🤖 Ask AI", url: aiUrl! }]);
+    // No mailto button; Telegram inline button URLs must be http/https/tg.
 
-    const opts: { parse_mode: ParseMode; reply_markup?: InlineKeyboardMarkup } = {
-      parse_mode: "Markdown",
+    const opts: any = {
+      parse_mode: 'Markdown'
     };
     if (inline_keyboard.length) opts.reply_markup = { inline_keyboard };
 
@@ -264,45 +253,30 @@ export async function sendTaskAssignedMsg(
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
-      const msg = await bot!.telegram.sendMessage(chatId, textLines, opts);
+      const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
-    } catch (err: unknown) {
-      if (isTelegramApiError(err)) {
-        const code = err.response?.error_code;
-        const desc = String(err.response?.description || "");
-        console.error("Telegram sendMessage failed:", { code, desc });
+    } catch (err: any) {
+      const code = err?.response?.error_code;
+      const desc = String(err?.response?.description || "");
+      console.error("Telegram sendMessage failed:", { code, desc });
 
-        if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
-        if (code === 403) return { ok: false, reason: "user_blocked_bot" };
-        return { ok: false, error: err.response };
-      }
-      return { ok: false, error: err };
+      if (code === 400 && /chat not found/i.test(desc)) return { ok: false, reason: "invalid_chat_id" };
+      if (code === 403) return { ok: false, reason: "user_blocked_bot" };
+      return { ok: false, error: err?.response || err };
     }
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Unexpected error in sendTaskAssignedMsg:", error);
     return { ok: false, error };
   }
 }
 
 /* -------------------------- DB hooks (dynamic import) ----------------------- */
-/** Strong types for the dynamic profiles module */
-type ProfilesModule = {
-  findProfileByPhone: (phone: string) => Promise<ProfileLite | null>;
-  linkTelegramToProfile: (
-    profileId: number,
-    data: {
-      telegram_chat_id: number;
-      telegram_username: string | null;
-      telegram_opt_in: boolean;
-    }
-  ) => Promise<unknown>;
-};
-
-async function findProfileByPhone(phone: string): Promise<ProfileLite | null> {
+async function findProfileByPhone(phone: string) {
   try {
-    const mod = (await import("./profiles")) as unknown as ProfilesModule;
-    return mod.findProfileByPhone(phone);
-  } catch (error: unknown) {
+    // Uses your implementation which matches by last-10 digits
+    const { findProfileByPhone } = await import("./profiles");
+    return findProfileByPhone(phone);
+  } catch (error) {
     console.error("Error in findProfileByPhone:", error);
     return null;
   }
@@ -317,9 +291,9 @@ async function linkTelegramToProfile(
   }
 ) {
   try {
-    const mod = (await import("./profiles")) as unknown as ProfilesModule;
-    return mod.linkTelegramToProfile(profileId, data);
-  } catch (error: unknown) {
+    const { linkTelegramToProfile } = await import("./profiles");
+    return linkTelegramToProfile(profileId, data);
+  } catch (error) {
     console.error("Error in linkTelegramToProfile:", error);
     throw error;
   }

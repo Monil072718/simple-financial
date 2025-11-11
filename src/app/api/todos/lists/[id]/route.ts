@@ -4,8 +4,7 @@ import { getUserId } from "@/lib/getUser";
 
 export const runtime = "nodejs";
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const ownerId = getUserId(req);
   const row = db()
     .prepare(
@@ -15,14 +14,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
        FROM todo_lists l
        WHERE l.ownerId = ? AND l.id = ?`
     )
-    .get(ownerId, Number(id));
+    .get(ownerId, Number(params.id));
 
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(row);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { name } = await req.json().catch(() => ({}));
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -33,21 +31,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const ts = nowISO();
   const res = d
     .prepare(`UPDATE todo_lists SET name = ?, updatedAt = ? WHERE id = ? AND ownerId = ?`)
-    .run(name.trim(), ts, Number(id), ownerId);
+    .run(name.trim(), ts, Number(params.id), ownerId);
 
   if (res.changes === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const row = d
     .prepare(`SELECT id, name, createdAt, updatedAt FROM todo_lists WHERE id = ?`)
-    .get(Number(id));
+    .get(Number(params.id));
   return NextResponse.json(row);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const ownerId = getUserId(req);
   const d = db();
-  const listId = Number(id);
+  const listId = Number(params.id);
 
   const exists = d
     .prepare(`SELECT id FROM todo_lists WHERE id = ? AND ownerId = ?`)

@@ -1,44 +1,34 @@
 // src/lib/db.ts
-import { Pool, type QueryResult, type QueryResultRow } from "pg";
+import { Pool } from "pg";
 
-// Export the pool so callers can use it (e.g., for migrations / health checks)
-export const pool = new Pool({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
 
-export type QueryResultSafe<T extends QueryResultRow = QueryResultRow> = {
-  rows: T[];
-  rowCount: number;
-};
+export type QueryResultSafe<T = any> = { rows: T[]; rowCount: number };
 
-/**
- * Safe query helper for SELECT/INSERT/UPDATE/DELETE.
- * - T is the row shape you expect back.
- */
-export async function query<T extends QueryResultRow = QueryResultRow>(
+// Safe for SELECT/INSERT/UPDATE etc. (normalizes rows/rowCount)
+export async function query<T = any>(
   text: string,
-  params?: ReadonlyArray<unknown>
+  params?: any[]
 ): Promise<QueryResultSafe<T>> {
-  const res: QueryResult<T> = await pool.query<T>(text, params ? [...params] : undefined);
+  const res: any = await pool.query(text, params);
 
-  const rows: T[] = Array.isArray(res.rows) ? res.rows : [];
-  const rowCount: number = typeof res.rowCount === "number" ? res.rowCount : rows.length;
+  const rows: T[] = Array.isArray(res?.rows) ? (res.rows as T[]) : [];
+  const rowCount: number =
+    typeof res?.rowCount === "number" ? res.rowCount : rows.length;
 
   return { rows, rowCount };
 }
 
-/**
- * Execute statements where you don't need returned rows (e.g., DDL).
- */
-export async function exec(text: string, params?: ReadonlyArray<unknown>): Promise<void> {
-  await pool.query(text, params ? [...params] : undefined);
+// Use this for DDL or when you don't need rows
+export async function exec(text: string, params?: any[]): Promise<void> {
+  await pool.query(text, params);
 }
 
-/**
- * Optional connectivity probe.
- */
-export async function ping(): Promise<string | undefined> {
+// Optional
+export async function ping() {
   const r = await query<{ now: string }>("SELECT NOW() AS now");
   return r.rows[0]?.now;
 }

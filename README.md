@@ -2,7 +2,52 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Using Docker (Recommended)
+
+#### Prerequisites
+- Docker and Docker Compose installed on your system
+
+#### Development with Docker
+
+1. Create a `.env` file in the root directory (you can use the example below):
+```env
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/simple_financial
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=simple_financial
+POSTGRES_PORT=5432
+PGSSL=false
+APP_PORT=3000
+NODE_ENV=development
+```
+
+2. Start the development environment:
+```bash
+docker-compose -f docker-compose.dev.yml up --build
+```
+
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+#### Production with Docker
+
+1. Create a `.env` file with production values
+2. Build and start the containers:
+```bash
+docker-compose up --build -d
+```
+
+3. The application will be available at [http://localhost:3000](http://localhost:3000)
+
+#### Docker Commands
+
+- Stop containers: `docker-compose down`
+- View logs: `docker-compose logs -f`
+- Rebuild containers: `docker-compose up --build`
+- Access database: `docker exec -it simple-financial-db psql -U postgres -d simple_financial`
+
+### Local Development (Without Docker)
+
+First, make sure you have PostgreSQL running locally, then:
 
 ```bash
 npm run dev

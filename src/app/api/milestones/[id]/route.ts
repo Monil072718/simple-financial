@@ -12,24 +12,17 @@ const updateSchema = z.object({
   priority: z.enum(["Low", "Medium", "High"]).optional(),
   difficulty: z.enum(["Easy", "Medium", "Hard"]).optional(),
 });
-type UpdatePayload = z.infer<typeof updateSchema>;
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id: idStr } = await params;
-  const id = Number(idStr);
-  if (!idStr || Number.isNaN(id)) {
-    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
-  }
-
-  const json = (await req.json().catch(() => ({}))) as unknown;
+  const id = Number(params.id);
+  const json = await req.json().catch(() => ({}));
   const parsed = updateSchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // Load milestone + project ownership
   const { rows: msRows } = await query(
     `SELECT m.*, p.owner_email
      FROM milestones m
@@ -39,26 +32,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   );
   const ms = msRows[0];
   if (!ms) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (ms.owner_email !== user.email) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  if (ms.owner_email !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Build dynamic SET list
   const sets: string[] = [];
-  const vals: (string | null)[] = [];
+  const vals: any[] = [];
   let idx = 1;
-  const push = (column: string, value: string | null) => {
-    sets.push(`${column} = $${++idx}`);
-    vals.push(value);
-  };
 
-  const data: UpdatePayload = parsed.data;
-  if (data.title !== undefined) push("title", data.title);
-  if (data.description !== undefined) push("description", data.description);
-  if (data.dueDate !== undefined) push("due_date", data.dueDate);
-  if (data.priority !== undefined) push("priority", data.priority);
-  if (data.difficulty !== undefined) push("difficulty", data.difficulty);
+  const push = (sql: string, v: any) => { sets.push(`${sql} = $${++idx}`); vals.push(v); };
+
+  if (parsed.data.title !== undefined) push("title", parsed.data.title);
+  if (parsed.data.description !== undefined) push("description", parsed.data.description);
+  if (parsed.data.dueDate !== undefined) push("due_date", parsed.data.dueDate);
+  if (parsed.data.priority !== undefined) push("priority", parsed.data.priority);
+  if (parsed.data.difficulty !== undefined) push("difficulty", parsed.data.difficulty);
 
   if (!sets.length) {
+    // Nothing to update, just return current
     return NextResponse.json({
       id: ms.id,
       project_id: ms.project_id,
@@ -71,28 +61,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
+  // First param is id; we already used $1, so vals start after it
   await query(`UPDATE milestones SET ${sets.join(", ")} WHERE id = $1`, [id, ...vals]);
 
   const { rows } = await query(
     `SELECT id, project_id, title, description, due_date, priority, difficulty, created_at
-     FROM milestones
-     WHERE id = $1`,
+     FROM milestones WHERE id = $1`,
     [id]
   );
 
   return NextResponse.json(rows[0]);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id: idStr } = await params;
-  const id = Number(idStr);
-  if (!idStr || Number.isNaN(id)) {
-    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
-  }
+  const id = Number(params.id);
 
+  // Ownership check
   const { rows: msRows } = await query(
     `SELECT m.id, p.owner_email
      FROM milestones m
@@ -102,9 +89,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   );
   const ms = msRows[0];
   if (!ms) return NextResponse.json({ ok: true });
-  if (ms.owner_email !== user.email) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  if (ms.owner_email !== user.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await query("DELETE FROM milestones WHERE id = $1", [id]);
   return NextResponse.json({ ok: true });

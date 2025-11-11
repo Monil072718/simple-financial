@@ -1,34 +1,10 @@
-// src/app/api/todos/lists/[id]/items/route.ts  (adjust path if different)
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { db, nowISO, type TodoItemPayload } from "@/lib/todos.db";
+import { db, nowISO, TodoItemPayload } from "@/lib/todos.db";
 import { getUserId } from "@/lib/getUser";
 
 export const runtime = "nodejs";
 
-/** Row shape used by SELECT for list items */
-type TodoListItemRow = {
-  id: number;
-  listId: number | null;
-  content: string;
-  description: string | null;
-  link: string | null;
-  considerations: string | null;
-  priority: "Low" | "Medium" | "High" | "Urgent" | null;
-  dueDate: string | null;
-  assigneeId: number | null;
-  tags: string | null; // JSON string in DB
-  status: string;
-  position: number | null;
-  projectId: number | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type InsertResult = { lastInsertRowid: number; changes: number };
-type PosRow = { pos: number };
-
-/** Helper to read and validate the dynamic :id */
+// Helper to read and validate the dynamic :id
 async function readListId(paramsPromise: Promise<{ id: string }>) {
   const { id } = await paramsPromise;
   const listId = Number(id);
@@ -38,22 +14,7 @@ async function readListId(paramsPromise: Promise<{ id: string }>) {
   return listId;
 }
 
-/** POST body schema (coerces numbers; allows partial payload) */
-const CreateItemSchema = z.object({
-  content: z.string().min(1),
-  description: z.string().nullable().optional(),
-  link: z.string().nullable().optional(),
-  considerations: z.string().nullable().optional(),
-  priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional(),
-  dueDate: z.string().nullable().optional(),
-  assigneeId: z.coerce.number().int().positive().nullable().optional(),
-  tags: z.array(z.string()).optional(),
-  status: z.string().optional(),
-  position: z.coerce.number().int().nullable().optional(),
-  projectId: z.coerce.number().int().positive().nullable().optional(),
-});
-
-/* ========================= GET /api/todos/lists/:id/items ========================= */
+// GET /api/todos/lists/:id/items
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
@@ -70,54 +31,53 @@ export async function GET(
          WHERE ownerId = ? AND listId = ?
          ORDER BY position ASC, id ASC`
       )
-      .all(ownerId, listId) as TodoListItemRow[];
+      .all(ownerId, listId);
 
-    const items = rows.map((r) => ({
+    const items = rows.map((r: any) => ({
       ...r,
-      tags: r.tags ? JSON.parse(r.tags) : [],
+      tags: JSON.parse(r.tags || "[]"),
     }));
 
     return NextResponse.json(items);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch items";
-    return NextResponse.json({ error: message }, { status: 400 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || "Failed to fetch items" },
+      { status: 400 }
+    );
   }
 }
 
-/* ========================= POST /api/todos/lists/:id/items ========================= */
+// POST /api/todos/lists/:id/items
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const raw = (await req.json().catch(() => ({}))) as unknown;
-    const parsed = CreateItemSchema.safeParse(raw);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    const body: TodoItemPayload = await req.json().catch(() => ({} as any));
+    if (!body?.content || typeof body.content !== "string") {
+      return NextResponse.json({ error: "content is required" }, { status: 400 });
     }
-
-    // If you still need TodoItemPayload for other places, this keeps compatibility
-    const body: TodoItemPayload = parsed.data as unknown as TodoItemPayload;
 
     const ownerId = getUserId(req);
     const d = db();
     const ts = nowISO();
     const listId = await readListId(ctx.params);
 
-    const priority =
-      (body.priority ?? "Medium") as "Low" | "Medium" | "High" | "Urgent";
-    const tagsJson = JSON.stringify(body.tags ?? []);
+    const priority = (body.priority || "Medium") as
+      | "Low"
+      | "Medium"
+      | "High"
+      | "Urgent";
+    const tags = JSON.stringify(body.tags || []);
 
-    // Compute position
-    const posRow = d
-      .prepare(
-        `SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?`
-      )
-      .get(listId) as PosRow;
-    const nextPos =
-      typeof body.position === "number" && Number.isFinite(body.position)
+    const position =
+      typeof body.position === "number"
         ? body.position
-        : Number(posRow.pos) || 1;
+        : (d
+            .prepare(
+              `SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?`
+            )
+            .get(listId) as any).pos;
 
     const info = d
       .prepare(
@@ -130,28 +90,30 @@ export async function POST(
         listId,
         ownerId,
         body.content.trim(),
-        body.description ?? null,
-        body.link ?? null,
-        body.considerations ?? null,
+        body.description || null,
+        body.link || null,
+        body.considerations || null,
         priority,
-        body.dueDate ?? null,
-        body.assigneeId ?? null,
-        tagsJson,
-        body.status ?? "open",
-        nextPos,
+        body.dueDate || null,
+        body.assigneeId || null,
+        tags,
+        body.status || "open",
+        position,
         body.projectId ?? null,
         ts,
         ts
-      ) as InsertResult;
+      );
 
     const row = d
       .prepare(`SELECT * FROM todo_items WHERE id = ?`)
-      .get(info.lastInsertRowid) as TodoListItemRow;
+      .get(info.lastInsertRowid as number) as any;
+    row.tags = JSON.parse(row.tags || "[]");
 
-    const response = { ...row, tags: row.tags ? JSON.parse(row.tags) : [] };
-    return NextResponse.json(response, { status: 201 });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to create item";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(row, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || "Failed to create item" },
+      { status: 400 }
+    );
   }
 }

@@ -1,50 +1,7 @@
-// src/app/api/todos/[id]/move/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db, nowISO } from "@/lib/todos.db";
 import { getUserId } from "@/lib/getUser";
 import { createTask } from "@/lib/tasks";
-
-export const runtime = "nodejs";
-
-type TodoRow = {
-  id: number;
-  ownerId: number;
-  listId: number | null;
-  projectId: number | null;
-  position: number;
-  status: string;
-  content: string;
-  description: string | null;
-  assigneeId: number | null;
-  priority: "Low" | "Medium" | "High" | null;
-  dueDate: string | null;
-  tags: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type PosRow = { pos: number };
-
-const BodySchema = z
-  .object({
-    listId: z.union([z.string(), z.number()]).optional(),
-    projectId: z.union([z.string(), z.number()]).optional(),
-  })
-  .refine((v) => Boolean(v.listId || v.projectId), {
-    message: "Provide listId or projectId",
-    path: ["listId"],
-  });
-
-const numOrNull = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim();
-  return /^\d+$/.test(s) ? Number(s) : null;
-};
-const strOrNull = (v: unknown): string | null => {
-  const s = (v ?? "").toString().trim();
-  return s.length ? s : null;
-};
 
 export async function POST(
   req: NextRequest,
@@ -52,98 +9,96 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
   const itemId = Number(id);
-  if (!Number.isFinite(itemId) || itemId <= 0) {
+  if (!itemId)
     return NextResponse.json({ error: "Invalid item id" }, { status: 400 });
-  }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = BodySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-
-  const listIdNum =
-    parsed.data.listId != null ? Number(parsed.data.listId) : undefined;
-  const projectIdNum =
-    parsed.data.projectId != null ? Number(parsed.data.projectId) : undefined;
-
-  if (listIdNum !== undefined && (!Number.isFinite(listIdNum) || listIdNum <= 0)) {
-    return NextResponse.json({ error: "Invalid listId" }, { status: 400 });
-  }
-  if (projectIdNum !== undefined && (!Number.isFinite(projectIdNum) || projectIdNum <= 0)) {
-    return NextResponse.json({ error: "Invalid projectId" }, { status: 400 });
+  const { listId, projectId } = await req.json().catch(() => ({} as any));
+  if (!listId && !projectId) {
+    return NextResponse.json(
+      { error: "Provide listId or projectId" },
+      { status: 400 }
+    );
   }
 
   const ownerId = getUserId(req);
   const d = db();
 
-  // 1) verify ownership
+  // 1) Ensure todo exists and belongs to user
   const existing = d
-    .prepare<[number, string], TodoRow>(
-      "SELECT * FROM todo_items WHERE id = ? AND ownerId = ?"
-    )
-    .get(itemId, ownerId) as TodoRow | undefined;
+    .prepare("SELECT * FROM todo_items WHERE id = ? AND ownerId = ?")
+    .get(itemId, ownerId) as any | undefined;
 
-  if (!existing) {
+  if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
 
   const ts = nowISO();
 
-  // 2) move inside todos (to a list)
-  if (listIdNum !== undefined) {
-    const posRow = d
-      .prepare<[number], PosRow>(
-        "SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?"
-      )
-      .get(listIdNum) as PosRow;
-
-    const nextPos = Number(posRow.pos) || 1;
+  // 2) If moving to another list (inside todos)
+  if (listId) {
+    const pos = (
+      d
+        .prepare(
+          "SELECT IFNULL(MAX(position),0)+1 AS pos FROM todo_items WHERE listId = ?"
+        )
+        .get(Number(listId)) as any
+    ).pos;
 
     d.prepare(
       "UPDATE todo_items SET listId = ?, projectId = NULL, position = ?, updatedAt = ? WHERE id = ? AND ownerId = ?"
-    ).run(listIdNum, nextPos, ts, itemId, ownerId);
+    ).run(Number(listId), pos, ts, itemId, ownerId);
 
     const row = d
-      .prepare<[number], TodoRow>("SELECT * FROM todo_items WHERE id = ?")
-      .get(itemId) as TodoRow;
-
-    const tags: unknown = row.tags ? JSON.parse(row.tags) : [];
-    return NextResponse.json({ todo: { ...row, tags } });
+      .prepare("SELECT * FROM todo_items WHERE id = ?")
+      .get(itemId) as any;
+    row.tags = JSON.parse(row.tags || "[]");
+    return NextResponse.json({ todo: row });
   }
 
-  // 3) move to a project backlog → create task in PG
-  const priorityMap: Record<string, "low" | "medium" | "high"> = {
+  // 3) If moving to a PROJECT backlog -> CREATE a real Postgres task
+  // map priority from SQLite ('Low'|'Medium'|'High') -> tasks ('low'|'medium'|'high')
+  const priorityMap: Record<string, string> = {
     Low: "low",
     Medium: "medium",
     High: "high",
   };
 
+  // helpers to sanitize values coming from SQLite
+  const numOrNull = (v: any) => {
+    if (v === null || v === undefined) return null;
+    // accept number-like strings only
+    const s = String(v).trim();
+    return /^\d+$/.test(s) ? Number(s) : null;
+  };
+  const strOrNull = (v: any) => {
+    const s = (v ?? "").toString().trim();
+    return s.length ? s : null;
+  };
+
   const taskPayload = {
-    projectId: projectIdNum!, // validated above
+    projectId: Number(projectId), // already validated earlier
     title: existing.content,
     description: strOrNull(existing.description),
-    assigneeId: numOrNull(existing.assigneeId),
-    status: "todo" as const,
-    priority: priorityMap[existing.priority ?? "Medium"] ?? ("medium" as const),
-    dueDate: strOrNull(existing.dueDate),
-    _isFromTodo: true as const,
+    assigneeId: numOrNull(existing.assigneeId), // <- avoid NaN
+    status: "todo",
+    priority: priorityMap[existing.priority || "Medium"] || "medium",
+    dueDate: strOrNull(existing.dueDate), // '' -> null
+    _isFromTodo: true, // Flag to indicate this is from todo item
   };
 
   const createdTask = await createTask(taskPayload);
 
-  // 4) archive local todo
+  // 4) Mark the todo item as archived (or delete it if you prefer)
   d.prepare(
     "UPDATE todo_items SET projectId = ?, status = 'archived', updatedAt = ? WHERE id = ? AND ownerId = ?"
-  ).run(projectIdNum!, ts, itemId, ownerId);
+  ).run(Number(projectId), ts, itemId, ownerId);
 
-  const updated = d
-    .prepare<[number], TodoRow>("SELECT * FROM todo_items WHERE id = ?")
-    .get(itemId) as TodoRow;
+  const updatedTodo = d
+    .prepare("SELECT * FROM todo_items WHERE id = ?")
+    .get(itemId) as any;
+  updatedTodo.tags = JSON.parse(updatedTodo.tags || "[]");
 
-  const updatedTags: unknown = updated.tags ? JSON.parse(updated.tags) : [];
   return NextResponse.json(
-    { todo: { ...updated, tags: updatedTags }, task: createdTask },
+    { todo: updatedTodo, task: createdTask },
     { status: 201 }
   );
 }
