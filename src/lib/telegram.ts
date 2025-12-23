@@ -91,18 +91,26 @@ export async function startBot() {
   try {
     const isProd = process.env.NODE_ENV === "production";
 
-    // Build webhook URL (prod only)
+    // Build webhook URL (prod only, and only if we have a valid public URL)
     const baseUrl = process.env.APP_URL || process.env.PUBLIC_URL;
-    const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${process.env.TG_WEBHOOK_SECRET}`;
+    const webhookSecret = process.env.TG_WEBHOOK_SECRET;
+    const hasValidWebhookUrl = baseUrl && isPublicHttpsUrl(baseUrl) && webhookSecret;
 
-    if (isProd) {
+    if (isProd && hasValidWebhookUrl) {
+      // Production with valid HTTPS URL → use webhook
+      const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${webhookSecret}`;
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
     } else {
-      // Dev → polling
+      // Dev or no valid webhook URL → use polling
       await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-      console.log("Webhook cleared; starting polling…");
+      if (isProd && !hasValidWebhookUrl) {
+        console.log("Telegram bot: Production mode but no valid webhook URL configured. Using polling mode.");
+        console.log("To use webhooks, set APP_URL or PUBLIC_URL to a valid HTTPS URL and TG_WEBHOOK_SECRET");
+      } else {
+        console.log("Telegram bot: Starting in polling mode (development)");
+      }
       await bot.launch({ dropPendingUpdates: true });
       console.log("Telegram bot started with polling");
     }

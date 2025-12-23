@@ -213,14 +213,13 @@ BEFORE UPDATE ON todo_items
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- Milestones
-CREATE TABLE IF NOT EXISTS milestones (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id   INTEGER NOT NULL,
+CREATE TABLE IF NOT EXISTS public.milestones (
+  id           SERIAL PRIMARY KEY,
+  project_id   INTEGER NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   title        TEXT NOT NULL,
   description  TEXT,
-  due_date     TEXT,
+  due_date     DATE,
   priority     TEXT CHECK (priority IN ('Low','Medium','High')) DEFAULT 'Medium',
   difficulty   TEXT CHECK (difficulty IN ('Easy','Medium','Hard')) DEFAULT 'Medium',
-  created_at   TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY(project_id) REFERENCES projects(id)
+  created_at   TIMESTAMPTZ DEFAULT NOW()
 );

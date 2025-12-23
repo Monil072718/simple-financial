@@ -61,17 +61,36 @@ export async function createTask(data: any) {
     }
   }
 
-  // NOTE: assignee_id is resolved via subselect to avoid FK errors.
+  // NOTE: assignee_id must reference users(id), not profiles(id)
+  // If assigneeId is a profile ID, get the user_id from profiles
+  // If assigneeId is a user ID, verify it exists in users
+  let userId: number | null = null;
+  if (data.assigneeId) {
+    // First try to get user_id from profiles if it's a profile ID
+    const profileCheck = await query(
+      "SELECT user_id FROM profiles WHERE id = $1",
+      [data.assigneeId]
+    );
+    if (profileCheck.rows.length > 0 && profileCheck.rows[0].user_id) {
+      userId = profileCheck.rows[0].user_id;
+    } else {
+      // If not found in profiles, check if it's already a user ID
+      const userCheck = await query(
+        "SELECT id FROM users WHERE id = $1",
+        [data.assigneeId]
+      );
+      if (userCheck.rows.length > 0) {
+        userId = data.assigneeId;
+      }
+    }
+  }
+
   const { rows } = await query(
     `INSERT INTO tasks(
         project_id, title, description, assignee_id, status, priority, due_date
      )
      VALUES(
-        $1, $2, $3,
-        CASE
-          WHEN $4::int IS NULL THEN NULL::int
-          ELSE (SELECT id FROM profiles WHERE id = $4::int)
-        END,
+        $1, $2, $3, $4,
         COALESCE($5,'todo'),
         COALESCE($6,'medium'),
         $7
@@ -81,7 +100,7 @@ export async function createTask(data: any) {
       data.projectId,
       data.title,
       data.description ?? null,
-      data.assigneeId ?? null, // may be unknown; subselect makes it NULL safely
+      userId, // Use resolved user_id
       data.status ?? null,
       data.priority ?? null,
       data.dueDate ?? null,
@@ -102,11 +121,26 @@ export async function updateTask(id: number, data: any) {
   const assigneeProvided =
     Object.prototype.hasOwnProperty.call(data, "assigneeId");
 
-  // normalize: never send undefined to PG
-  let assigneeValue: number | null = null;
-  if (assigneeProvided) {
-    const n = Number(data.assigneeId);
-    assigneeValue = Number.isFinite(n) ? n : null;
+  // Resolve assigneeId to user_id (assignee_id must reference users, not profiles)
+  let userId: number | null = null;
+  if (assigneeProvided && data.assigneeId) {
+    // First try to get user_id from profiles if it's a profile ID
+    const profileCheck = await query(
+      "SELECT user_id FROM profiles WHERE id = $1",
+      [data.assigneeId]
+    );
+    if (profileCheck.rows.length > 0 && profileCheck.rows[0].user_id) {
+      userId = profileCheck.rows[0].user_id;
+    } else {
+      // If not found in profiles, check if it's already a user ID
+      const userCheck = await query(
+        "SELECT id FROM users WHERE id = $1",
+        [data.assigneeId]
+      );
+      if (userCheck.rows.length > 0) {
+        userId = data.assigneeId;
+      }
+    }
   }
 
   const sql = `
@@ -116,7 +150,7 @@ export async function updateTask(id: number, data: any) {
       assignee_id  = CASE
                        WHEN $8::boolean = false THEN t.assignee_id
                        WHEN $3::int IS NULL       THEN NULL::int
-                       WHEN EXISTS (SELECT 1 FROM profiles u WHERE u.id = $3::int)
+                       WHEN EXISTS (SELECT 1 FROM users u WHERE u.id = $3::int)
                                               THEN $3::int
                        ELSE t.assignee_id
                      END,
@@ -131,7 +165,7 @@ export async function updateTask(id: number, data: any) {
   const params = [
     data.title ?? null,
     data.description ?? null,
-    assigneeValue,             // $3 (will be number or null)
+    userId,                    // $3 (resolved user_id or null)
     data.status ?? null,
     data.priority ?? null,
     data.dueDate ?? null,

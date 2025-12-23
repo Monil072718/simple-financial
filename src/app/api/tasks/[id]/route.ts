@@ -25,14 +25,19 @@ export async function PATCH(
   // Read raw body
   const raw = await req.json().catch(() => ({} as any));
 
-  // No coercion needed - all statuses are now supported in the database
-  // const coerceStatus = (s: any) => {
-  //   if (s == null) return s;
-  //   const v = String(s).toLowerCase();
-  //   if (v === "pending" || v === "assigned") return "todo";
-  //   return v;
-  // };
-  // if ("status" in raw) raw.status = coerceStatus(raw.status);
+  // Normalize status values to match database constraint (todo, in_progress, done)
+  const coerceStatus = (s: any) => {
+    if (s == null) return s;
+    const v = String(s).toLowerCase();
+    // Map frontend statuses to database statuses
+    if (v === "pending" || v === "assigned") return "todo";
+    if (v === "review") return "in_progress";
+    // Allow valid database statuses
+    if (v === "todo" || v === "in_progress" || v === "done") return v;
+    // Default to todo for unknown statuses
+    return "todo";
+  };
+  if ("status" in raw) raw.status = coerceStatus(raw.status);
 
   // Validate after coercion
   const parsed = taskUpdateSchema.safeParse(raw);

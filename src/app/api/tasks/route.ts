@@ -25,6 +25,21 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   
   const json = await req.json().catch(() => ({}));
+  
+  // Normalize status values to match database constraint (todo, in_progress, done)
+  const coerceStatus = (s: any) => {
+    if (s == null) return s;
+    const v = String(s).toLowerCase();
+    // Map frontend statuses to database statuses
+    if (v === "pending" || v === "assigned") return "todo";
+    if (v === "review") return "in_progress";
+    // Allow valid database statuses
+    if (v === "todo" || v === "in_progress" || v === "done") return v;
+    // Default to todo for unknown statuses
+    return "todo";
+  };
+  if ("status" in json) json.status = coerceStatus(json.status);
+  
   const parsed = taskCreateSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   

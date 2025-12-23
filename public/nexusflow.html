@@ -583,21 +583,34 @@
             let assigneeName = t.assignee || "";
 
             // If we have an assigneeId but no assignee name, try to look it up
+            // assigneeId is a user_id (from task.assignee_id), so match on userId
             if (t.assigneeId && !assigneeName) {
-              const user = state.users.find(u => Number(u.id) === Number(t.assigneeId));
+              const user = state.users.find(u => u.userId && Number(u.userId) === Number(t.assigneeId));
               if (user) {
                 assigneeName = user.name;
+              } else if (state.assigneeNameByUserId?.[t.assigneeId]) {
+                assigneeName = state.assigneeNameByUserId[t.assigneeId];
               }
             }
+
+            // Get communication days from aiComm
+            const commDays = (t.aiComm?.days || []);
+            const dayMap = {
+              "Mon": commDays.includes("Mon") ? "✓" : "",
+              "Tue": commDays.includes("Tue") ? "✓" : "",
+              "Wed": commDays.includes("Wed") ? "✓" : "",
+              "Thu": commDays.includes("Thu") ? "✓" : "",
+              "Fri": commDays.includes("Fri") ? "✓" : ""
+            };
 
             rows.push([
               { text: t.content || t.title || "", color: "" },
               { text: assigneeName, color: "" }, // Use the properly resolved assignee name
-              { text: "", color: "" },
-              { text: "", color: "" },
-              { text: "", color: "" },
-              { text: "", color: "" },
-              { text: "", color: "" },
+              { text: dayMap["Mon"], color: "" },
+              { text: dayMap["Tue"], color: "" },
+              { text: dayMap["Wed"], color: "" },
+              { text: dayMap["Thu"], color: "" },
+              { text: dayMap["Fri"], color: "" },
               { text: col.title, color: "" },
             ]);
           });
@@ -684,7 +697,8 @@
         try {
           const rows = await apiFetch("/api/profiles?q=&page=1&limit=100");
           state.users = rows.map((r) => ({
-            id: r.id,
+            id: r.id, // profile ID
+            userId: r.user_id, // user ID (for matching with task assignee_id)
             name: r.full_name,
             title: r.title || "",
             description: r.description || "",
@@ -698,9 +712,14 @@
             resumeUrl: r.resume_url || null,
           }));
 
-          // Build a quick lookup: id -> display name
-          state.assigneeNameById = {};
+          // Build a quick lookup: user_id -> display name (for task assignee_id matching)
+          state.assigneeNameByUserId = {};
           (state.users || []).forEach((u) => {
+            if (u.userId) {
+              state.assigneeNameByUserId[u.userId] = u.name;
+            }
+            // Also keep profile ID lookup for backward compatibility
+            state.assigneeNameById = state.assigneeNameById || {};
             state.assigneeNameById[u.id] = u.name;
           });
 
@@ -709,20 +728,67 @@
             const p = state.projects.find((x) => x.id === state.activeProjectId);
             if (p && p._tasksLoaded) {
               // make sure each task has a display name
+              // assigneeId is a user_id, so use assigneeNameByUserId lookup
+              let updated = false;
               p.columns.forEach((c) =>
                 (c.tasks || []).forEach((t) => {
                   if (t.assigneeId != null) {
-                    t.assignee = state.assigneeNameById[t.assigneeId] || "";
+                    const newName = state.assigneeNameByUserId?.[t.assigneeId] || "";
+                    if (newName && t.assignee !== newName) {
+                      t.assignee = newName;
+                      updated = true;
+                    }
                   }
                 })
               );
-              // rebuild Task Tracking Matrix and re-render
-              if (typeof syncTaskTrackingFromProject === "function") {
+              // rebuild Task Tracking Matrix and re-render if we updated anything
+              if (updated && typeof syncTaskTrackingFromProject === "function") {
                 syncTaskTrackingFromProject(p);
               }
-              render();
-              return; // we've already re-rendered
+              if (updated) {
+                render();
+                return; // we've already re-rendered
+              }
             }
+          }
+          
+          // Also try to load users directly as fallback for assignee lookup
+          try {
+            const users = await apiFetch("/api/users");
+            if (users && Array.isArray(users)) {
+              // Build additional lookup map from users table
+              users.forEach((u) => {
+                if (u.id && u.name && !state.assigneeNameByUserId?.[u.id]) {
+                  state.assigneeNameByUserId = state.assigneeNameByUserId || {};
+                  state.assigneeNameByUserId[u.id] = u.name;
+                }
+              });
+              
+              // Refresh tasks again with user data
+              if (state.activeProjectId) {
+                const p = state.projects.find((x) => x.id === state.activeProjectId);
+                if (p && p._tasksLoaded) {
+                  let updated = false;
+                  p.columns.forEach((c) =>
+                    (c.tasks || []).forEach((t) => {
+                      if (t.assigneeId != null && !t.assignee) {
+                        const newName = state.assigneeNameByUserId?.[t.assigneeId] || "";
+                        if (newName) {
+                          t.assignee = newName;
+                          updated = true;
+                        }
+                      }
+                    })
+                  );
+                  if (updated && typeof syncTaskTrackingFromProject === "function") {
+                    syncTaskTrackingFromProject(p);
+                    render();
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            // Silently fail - users endpoint might not be available
           }
           // END ADD
 
@@ -750,11 +816,23 @@
           } catch { }
 
           (tasks || []).forEach((t) => {
-            // Find the user by assignee_id to get the proper name
+            // Find the user by assignee_id (which is a user_id, not profile id)
             let assigneeName = "";
             if (t.assignee_id) {
-              const user = state.users.find(u => Number(u.id) === Number(t.assignee_id));
-              assigneeName = user ? user.name : "";
+              // Try multiple lookup methods:
+              // 1. Look up by user_id in profiles
+              const user = state.users.find(u => u.userId && Number(u.userId) === Number(t.assignee_id));
+              if (user) {
+                assigneeName = user.name;
+              } else {
+                // 2. Try lookup map
+                assigneeName = state.assigneeNameByUserId?.[t.assignee_id] || "";
+                // 3. If still not found, try direct user lookup (fallback)
+                if (!assigneeName) {
+                  const directUser = state.users.find(u => Number(u.id) === Number(t.assignee_id));
+                  if (directUser) assigneeName = directUser.name;
+                }
+              }
             }
 
             const sched = schedulesByTask[t.id];
@@ -1026,7 +1104,8 @@
           if (task) {
             const user = state.users.find(u => u.id == profileId);
             if (user) {
-              task.assigneeId = parseInt(profileId);
+              // Store user_id (not profile id) in assigneeId since backend expects user_id
+              task.assigneeId = user.userId ? parseInt(user.userId) : parseInt(profileId);
               task.assignee = user.name;
 
               // Highlight the selected suggestion
@@ -1049,9 +1128,16 @@
               }
 
               // Update the task in the database (no immediate render to preserve selection)
+              // Send user_id if available, otherwise send profile ID (backend will convert)
+              const assigneeIdToSend = user.userId ? parseInt(user.userId) : parseInt(profileId);
               apiFetch(`/api/tasks/${taskId}`, {
                 method: 'PATCH',
-                body: { assigneeId: parseInt(profileId) }
+                body: { assigneeId: assigneeIdToSend }
+              }).then(response => {
+                // Update local state with the actual user_id from response if available
+                if (response.assignee_id) {
+                  task.assigneeId = response.assignee_id;
+                }
               }).catch(err => {
                 console.error('Failed to assign:', err);
               });
@@ -1153,13 +1239,22 @@
         if (task?.assignee != null && typeof task.assignee !== "string") {
           const candidateId = Number(task.assignee);
           if (Number.isFinite(candidateId)) {
-            const uNum = users.find((x) => Number(x.id) === candidateId);
+            // Try user_id lookup first (for user IDs)
+            const uNum = users.find((x) => x.userId && Number(x.userId) === candidateId);
             if (uNum) return uNum.name || "";
+            // Fallback to profile ID lookup
+            const uNumProfile = users.find((x) => Number(x.id) === candidateId);
+            if (uNumProfile) return uNumProfile.name || "";
           }
         }
         if (task?.assigneeId != null) {
-          const u = users.find((x) => Number(x.id) === Number(task.assigneeId));
+          // assigneeId is a user_id, so match on userId
+          const u = users.find((x) => x.userId && Number(x.userId) === Number(task.assigneeId));
           if (u) return u.name || "";
+          // Fallback to lookup map
+          if (state.assigneeNameByUserId?.[task.assigneeId]) {
+            return state.assigneeNameByUserId[task.assigneeId];
+          }
         }
         return "";
       }
@@ -1352,6 +1447,35 @@
           .flatMap(p => p.columns.flatMap(c => c.tasks))
           .filter(t => t.aiComm && t.aiComm.active);
 
+        // Helper function to get assignee name with proper lookup
+        const getAssigneeNameForTask = (task) => {
+          // If assignee is already set and is a string, use it
+          if (task.assignee && typeof task.assignee === 'string') {
+            return task.assignee;
+          }
+          
+          // If we have assigneeId, look it up
+          if (task.assigneeId != null) {
+            // Try multiple lookup methods:
+            // 1. Look up by user_id in profiles
+            const user = state.users.find(u => u.userId && Number(u.userId) === Number(task.assigneeId));
+            if (user) {
+              return user.name;
+            }
+            // 2. Try lookup map
+            if (state.assigneeNameByUserId?.[task.assigneeId]) {
+              return state.assigneeNameByUserId[task.assigneeId];
+            }
+            // 3. Fallback to direct user lookup
+            const directUser = state.users.find(u => Number(u.id) === Number(task.assigneeId));
+            if (directUser) {
+              return directUser.name;
+            }
+          }
+          
+          return 'Unassigned';
+        };
+
         return `<div class="p-6">
             <h2 class="text-2xl font-bold mb-6">Active AI Communications</h2>
             <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto mb-8">
@@ -1366,15 +1490,18 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${activeComms.map(task => `
+                  ${activeComms.map(task => {
+                    const assigneeName = getAssigneeNameForTask(task);
+                    return `
                     <tr class="border-b border-gray-700">
                       <td class="px-6 py-4">${task.content}</td>
-                      <td class="px-6 py-4">${task.assignee || 'Unassigned'}</td>
+                      <td class="px-6 py-4">${assigneeName}</td>
                       <td class="px-6 py-4">${task.aiComm.frequency}</td>
                       <td class="px-6 py-4">${(task.aiComm.days || []).join(', ')}</td>
                       <td class="px-6 py-4">Tomorrow 9:00 AM</td>
                     </tr>
-                  `).join('') || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}
+                  `;
+                  }).join('') || '<tr><td colspan="5" class="text-center p-4 text-gray-500">No active communications.</td></tr>'}
                 </tbody>
               </table>
             </div>
@@ -2754,7 +2881,8 @@ Created: ${new Date().toLocaleDateString()}`;
         const projectName = project ? project.name : '';
 
         const taskForMsg = {
-          id: state.activeTask ? state.activeTask.id : created?.id,    // created from your POST response
+          // Use the currently active task id if present; otherwise leave null
+          id: state.activeTask ? state.activeTask.id : null,
           title: payload.title,
           description: payload.description || '',
           projectName,
