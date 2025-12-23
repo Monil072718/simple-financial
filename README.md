@@ -286,14 +286,6 @@ For support, email support@yourapp.com or join our Telegram group.
 - [ ] File attachments
 - [ ] Video conferencing integration
 
-## 📸 Screenshots
-
-![Dashboard](./docs/screenshots/dashboard.png)
-![Projects](./docs/screenshots/projects.png)
-![Tasks](./docs/screenshots/tasks.png)
-
----
-
 **Built with ❤️ using Next.js and PostgreSQL**
 
 ⭐ Star this repo if you find it helpful!
