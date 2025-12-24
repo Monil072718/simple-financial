@@ -311,5 +311,5 @@ async function linkTelegramToProfile(
   }
 }
 
-/* -------------------------- Autostart in this process ----------------------- */
-startBot().catch(console.error);
+/* -------------------------- Bot will be started via instrumentation.ts ----------------------- */
+// Note: startBot() is called from instrumentation.ts to avoid double initialization
