@@ -98,7 +98,9 @@ export async function startBot() {
 
     if (isProd && hasValidWebhookUrl) {
       // Production with valid HTTPS URL → use webhook
-      const webhookUrl = `${baseUrl}/api/communications/telegram/webhook/${webhookSecret}`;
+      // Remove trailing slash from baseUrl to prevent double slash in URL
+      const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+      const webhookUrl = `${cleanBaseUrl}/api/communications/telegram/webhook/${webhookSecret}`;
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
