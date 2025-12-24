@@ -101,11 +101,13 @@ export async function startBot() {
       // Remove trailing slash from baseUrl to prevent double slash in URL
       const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
       const webhookUrl = `${cleanBaseUrl}/api/communications/telegram/webhook/${webhookSecret}`;
+      if (!bot) throw new Error("Bot not initialized");
       await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
       await bot.telegram.setWebhook(webhookUrl);
       console.log("Telegram webhook configured:", webhookUrl);
     } else {
       // Dev or no valid webhook URL → use polling
+      if (!bot) throw new Error("Bot not initialized");
       await bot.telegram.deleteWebhook({ drop_pending_updates: true });
       if (isProd && !hasValidWebhookUrl) {
         console.log("Telegram bot: Production mode but no valid webhook URL configured. Using polling mode.");
@@ -120,7 +122,7 @@ export async function startBot() {
     if (!g.__botStarted) {
       const stop = async () => {
         try {
-          await bot.stop("SIGTERM");
+          if (bot) await bot.stop("SIGTERM");
         } catch {}
       };
       process.once("SIGINT", stop);
@@ -216,9 +218,8 @@ export async function sendTaskAssignedMsg(
     if (!g.__botStarted) await startBot();
 
     const aiBtnAllowed = isPublicHttpsUrl(aiUrl);
-    
     // Format priority with emoji
-    const priorityEmoji = {
+    const priorityEmoji: Record<string, string> = {
       'low': '🟢',
       'medium': '🟡', 
       'high': '🔴'
@@ -263,6 +264,7 @@ export async function sendTaskAssignedMsg(
     console.log("[TELEGRAM] sending", { chatId, title: task.title, aiBtnAllowed });
 
     try {
+      if (!bot) throw new Error("Bot not initialized");
       const msg = await bot.telegram.sendMessage(chatId, textLines, opts);
       return { ok: true, message_id: msg.message_id };
     } catch (err: any) {
