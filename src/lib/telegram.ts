@@ -29,9 +29,8 @@ if (!g.__bot && token) {
   });
 
   // Contact => link profile by phone (match on last 10 digits)
-  g.__bot.on("contact", async (ctx) => {
+  const handlePhoneLinking = async (ctx: any, phone: string) => {
     try {
-      const phone = ctx.message?.contact?.phone_number;
       const chatId = ctx.chat?.id;
       const username = ctx.from?.username || null;
 
@@ -40,7 +39,7 @@ if (!g.__bot && token) {
       const digits = phone.replace(/[^0-9]/g, "");
       const last10 = digits.slice(-10);
 
-      console.log("[TELEGRAM] incoming contact", {
+      console.log("[TELEGRAM] attempting link", {
         raw: phone,
         digits,
         last10,
@@ -65,11 +64,30 @@ if (!g.__bot && token) {
       console.error("contact error", e);
       await ctx.reply("Something went wrong linking your account.");
     }
+  };
+
+  // Contact => link profile by phone
+  g.__bot.on("contact", async (ctx) => {
+    const phone = ctx.message?.contact?.phone_number;
+    if (phone) {
+      await handlePhoneLinking(ctx, phone);
+    } else {
+      await ctx.reply("Could not read phone number from contact.");
+    }
   });
 
-  // Fallback
+  // Text => Check if it looks like a phone number, otherwise fallback
   g.__bot.on("text", async (ctx) => {
-    await ctx.reply("Type /start to (re)link your phone, or wait for task notifications.");
+    // @ts-ignore
+    const text = ctx.message?.text || "";
+    const digits = text.replace(/[^0-9]/g, "");
+    
+    // If user typed 10+ digits, assume it's a phone number attempt
+    if (digits.length >= 10) {
+      await handlePhoneLinking(ctx, text);
+    } else {
+      await ctx.reply("Type /start to (re)link your phone, or wait for task notifications.");
+    }
   });
 
   g.__botReady = true;

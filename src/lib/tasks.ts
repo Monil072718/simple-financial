@@ -49,17 +49,8 @@ export async function listTasks({
 }
 
 export async function createTask(data: any) {
-  // Check for duplicate task titles in the same project (only if not moving from todo)
-  if (!data._isFromTodo) {
-    const { rows: existingTasks } = await query(
-      "SELECT id FROM tasks WHERE project_id = $1 AND LOWER(title) = LOWER($2)",
-      [data.projectId, data.title]
-    );
-    
-    if (existingTasks.length > 0) {
-      throw new Error(`A task with the title "${data.title}" already exists in this project`);
-    }
-  }
+  // Check for duplicate task titles in the same project (removed to allow duplicates)
+  // if (!data._isFromTodo) { ... }
 
   // NOTE: assignee_id must reference users(id), not profiles(id)
   // If assigneeId is a profile ID, get the user_id from profiles
@@ -193,7 +184,7 @@ async function afterAssignNotify(assigneeId: number, task: any, project: any) {
   // Convert null name to undefined to match ProfileLite type
   const profile = {
     ...profileRaw,
-    name: profileRaw.name ?? undefined,
+    name: profileRaw.full_name ?? undefined,
   };
 
   await sendTaskAssignedMsg(

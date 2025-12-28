@@ -50,7 +50,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project not found or access denied" }, { status: 403 });
   }
   
-  const task = await createTask(parsed.data);
+  let task;
+  try {
+    task = await createTask(parsed.data);
+  } catch (error: any) {
+    console.error("Failed to create task:", error);
+    return NextResponse.json({ error: error.message || "Failed to create task" }, { status: 500 });
+  }
   
   // Send Telegram notification if task is assigned
   if (parsed.data.assigneeId) {

@@ -144,6 +144,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   languages TEXT[] DEFAULT '{}',
   admin_feedback TEXT NULL,
   resume_url TEXT NULL,
+  telegram_chat_id BIGINT NULL,
+  telegram_username TEXT NULL,
+  telegram_opt_in BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
